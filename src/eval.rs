@@ -36,7 +36,10 @@ fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Obj
   }
 }
 
-fn eval_function_definition(list: &Vec<Object>) -> Result<Object, String> {
+fn eval_function_definition(
+  list: &Vec<Object>,
+  env: &mut Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
   let params = match &list[1] {
     Object::List(list) => {
       let mut params = Vec::new();
@@ -58,7 +61,7 @@ fn eval_function_definition(list: &Vec<Object>) -> Result<Object, String> {
     _ => return Err(format!("Expected list of body")),
   };
 
-  Ok(Object::Lambda(params, body))
+  Ok(Object::Lambda(params, body, env.clone()))
 }
 
 fn eval_binary_op(
@@ -165,8 +168,8 @@ fn eval_function_call(
 
   let lambda = lambda.unwrap();
   match lambda {
-    Object::Lambda(params, body) => {
-      let mut new_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
+    Object::Lambda(params, body, func_env) => {
+      let mut new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
 
       for (i, param) in params.iter().enumerate() {
         let val = eval_object(&list[i + 1], env)?;
@@ -174,7 +177,7 @@ fn eval_function_call(
       }
       return eval_object(&Object::List(body), &mut new_env);
     }
-    _ => Err(format!("Not a lambda: {}", s)),
+    _ => Err(format!("{} is not a lambda", s)),
   }
 }
 
@@ -184,8 +187,8 @@ fn eval_anonymus_function_call(
 ) -> Result<Object, String> {
   let lambda = &list[0];
   match lambda {
-    Object::Lambda(params, body) => {
-      let mut new_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
+    Object::Lambda(params, body, func_env) => {
+      let mut new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
       for (i, param) in params.iter().enumerate() {
         let val = eval_object(&list[i + 1], env)?;
         new_env.borrow_mut().set(param, val);
@@ -203,7 +206,7 @@ fn eval_list(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
     Object::Keyword(_) => eval_keyword(list, env),
     Object::BinaryOp(_) => eval_binary_op(list, env),
     Object::If => eval_if(list, env),
-    Object::Lambda(_, _) => eval_function_definition(&list),
+    Object::Lambda(_, _, _) => eval_function_definition(&list, env),
     Object::Symbol(s) => eval_function_call(&s, &list, env),
     _ => {
       let mut new_list = Vec::new();
@@ -217,7 +220,7 @@ fn eval_list(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
 
       let head = new_list.get(0).unwrap_or(&Object::Void);
       match head {
-        Object::Lambda(_, _) => {
+        Object::Lambda(_, _, _) => {
           return eval_anonymus_function_call(&new_list, env);
         }
         _ => Ok(Object::List(new_list)),
@@ -231,7 +234,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
   match head {
     Object::Keyword(s) => match s.as_str() {
       "define" => eval_define(&list, env),
-      "lambda" => eval_function_definition(&list),
+      "lambda" => eval_function_definition(&list, env),
       _ => Err(format!("Unknown keyword: {}", s)),
     },
     _ => {
@@ -243,7 +246,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
 fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   match obj {
     Object::Void => Ok(Object::Void),
-    Object::Lambda(_params, _body) => Ok(Object::Void),
+    Object::Lambda(_params, _body, _func_env) => Ok(Object::Void),
     Object::Bool(_) => Ok(obj.clone()),
     Object::Integer(n) => Ok(Object::Integer(*n)),
     Object::Float(f) => Ok(Object::Float(*f)),
@@ -342,7 +345,7 @@ mod tests {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "
             (
-                (define pi 314)
+                (define pi 3.14)
                 (define r 10)
                 (define sqr (lambda (r) (* r r)))
                 (define area (lambda (r) (* pi (sqr r))))
@@ -353,7 +356,27 @@ mod tests {
     let result = eval(program, &mut env).unwrap();
     assert_eq!(
       result,
-      Object::List(vec![Object::Integer((314 * 10 * 10) as i64)])
+      Object::List(vec![Object::Float(3.14 * 10.0 * 10.0)])
+    );
+  }
+
+  #[test]
+  fn test_closure() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "
+            (
+                (define add-n
+                   (lambda (n)
+                      (lambda (a) (+ n a))))
+                (define add-5 (add-n 5))
+                (add-5 10)
+            )
+        ";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(
+      result,
+      Object::List(vec![Object::Integer(15)])
     );
   }
 }
