@@ -2,8 +2,14 @@
 name = "tlisp"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = """
+Lisp interpreter in Rust
+"""
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "tlisp"
+path = "src/main.rs"
 
 [dependencies]
 linefeed = "0.6.0"

@@ -5,7 +5,13 @@ use crate::object::Object;
 use crate::parser::parse;
 
 fn eval_symbol(s: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  let val = env.borrow_mut().get(s);
+  let val = match s {
+    "#t" => return Ok(Object::Bool(true)),
+    "#f" => return Ok(Object::Bool(false)),
+    "#nil" => return Ok(Object::Void),
+    _ => env.borrow_mut().get(s),
+  };
+
   if val.is_none() {
     return Err(format!("Unbound symbol: {}", s));
   }
@@ -27,12 +33,21 @@ fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result
   Ok(Object::Void)
 }
 
-fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  let condition = eval_object(&list[1], env)?;
-  match condition {
-    Object::Bool(true) => eval_object(&list[2], env),
-    Object::Bool(false) => eval_object(&list[3], env),
-    _ => Err(format!("Expected boolean")),
+fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box<Object>, String> {
+  if list.len() != 4 {
+    return Err(format!("Invalid number of arguments for if statement"));
+  }
+
+  let cond_obj = eval_object(&list[1], env)?;
+  let cond = match cond_obj {
+    Object::Bool(b) => b,
+    _ => return Err(format!("Condition must be a boolean")),
+  };
+
+  if cond {
+    Ok(Box::new(list[2].clone()))
+  } else {
+    Ok(Box::new(list[3].clone()))
   }
 }
 
@@ -160,7 +175,7 @@ fn eval_function_call(
   s: &str,
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
-) -> Result<Object, String> {
+) -> Result<(Box<Object>, Rc<RefCell<Environment>>), String> {
   let lambda = env.borrow_mut().get(s);
   if lambda.is_none() {
     return Err(format!("Unbound symbol: {}", s));
@@ -169,13 +184,14 @@ fn eval_function_call(
   let lambda = lambda.unwrap();
   match lambda {
     Object::Lambda(params, body, func_env) => {
-      let mut new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
+      let new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
 
       for (i, param) in params.iter().enumerate() {
         let val = eval_object(&list[i + 1], env)?;
         new_env.borrow_mut().set(param, val);
       }
-      return eval_object(&Object::List(body), &mut new_env);
+
+      return Ok((Box::new(Object::List(body)), new_env.clone()));
     }
     _ => Err(format!("{} is not a lambda", s)),
   }
@@ -184,48 +200,19 @@ fn eval_function_call(
 fn eval_anonymus_function_call(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
-) -> Result<Object, String> {
+) -> Result<(Box<Object>, Rc<RefCell<Environment>>), String> {
   let lambda = &list[0];
   match lambda {
     Object::Lambda(params, body, func_env) => {
-      let mut new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
+      let new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
+
       for (i, param) in params.iter().enumerate() {
         let val = eval_object(&list[i + 1], env)?;
         new_env.borrow_mut().set(param, val);
       }
-
-      eval_object(&Object::List(body.to_vec()), &mut new_env)
+      Ok((Box::new(Object::List(body.clone())), new_env))
     }
     _ => return Err(format!("Not a lambda")),
-  }
-}
-
-fn eval_list(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  let head = &list[0];
-  match head {
-    Object::Keyword(_) => eval_keyword(list, env),
-    Object::BinaryOp(_) => eval_binary_op(list, env),
-    Object::If => eval_if(list, env),
-    Object::Lambda(_, _, _) => eval_function_definition(&list, env),
-    Object::Symbol(s) => eval_function_call(&s, &list, env),
-    _ => {
-      let mut new_list = Vec::new();
-      for obj in list {
-        let result = eval_object(obj, env)?;
-        match result {
-          Object::Void => {}
-          _ => new_list.push(result),
-        }
-      }
-
-      let head = new_list.get(0).unwrap_or(&Object::Void);
-      match head {
-        Object::Lambda(_, _, _) => {
-          return eval_anonymus_function_call(&new_list, env);
-        }
-        _ => Ok(Object::List(new_list)),
-      }
-    }
   }
 }
 
@@ -244,16 +231,60 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
 }
 
 fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  match obj {
-    Object::Void => Ok(Object::Void),
-    Object::Lambda(_params, _body, _func_env) => Ok(Object::Void),
-    Object::Bool(_) => Ok(obj.clone()),
-    Object::Integer(n) => Ok(Object::Integer(*n)),
-    Object::Float(f) => Ok(Object::Float(*f)),
-    Object::String(s) => Ok(Object::String(s.clone())),
-    Object::Symbol(s) => eval_symbol(s, env),
-    Object::List(list) => eval_list(list, env),
-    _ => return Err(format!("Invalid object: {:?}", obj)),
+  let mut current_obj: Box<Object> = Box::new(obj.clone());
+  let mut current_env = env.clone();
+
+  loop {
+    match *current_obj {
+      Object::List(list) => {
+        let head = &list[0];
+        match head {
+          Object::BinaryOp(_op) => return eval_binary_op(&list, &mut current_env),
+          Object::Keyword(_k) => return eval_keyword(&list, &mut current_env),
+          Object::If => {
+            current_obj = eval_if(&list, &mut current_env)?;
+            continue;
+          }
+          Object::Symbol(s) => {
+            (current_obj, current_env) = eval_function_call(&s, &list, &mut current_env)?;
+            continue;
+          }
+          Object::Lambda(_, _, _) => {
+            (current_obj, current_env) = eval_anonymus_function_call(&list, &mut current_env)?;
+            continue;
+          }
+          _ => {
+            let mut new_list = Vec::new();
+            for obj in list {
+              let result = eval_object(&obj, &mut current_env)?;
+              match result {
+                Object::Void => {}
+                _ => new_list.push(result),
+              }
+            }
+
+
+            let head = new_list.first().unwrap_or(&Object::Void);
+            match head {
+              Object::Lambda(_, _, _) => {
+                return eval_object(&Object::List(new_list), &mut current_env);
+              }
+              _ => {
+                return Ok(Object::List(new_list));
+              }
+            }
+          }
+        }
+      }
+      Object::Void => return Ok(Object::Void),
+      Object::Bool(_) => return Ok(obj.clone()),
+      Object::Integer(n) => return Ok(Object::Integer(n)),
+      Object::Float(n) => return Ok(Object::Float(n)),
+      Object::String(s) => return Ok(Object::String(s.to_string())),
+      Object::Symbol(s) => return eval_symbol(&s, &mut current_env),
+      Object::Lambda(_params, _body, _func_env) => return Ok(Object::Void),
+      _ => return Err(format!("Invalid object: {:?}", obj)),
+    }
   }
 }
 
@@ -374,9 +405,23 @@ mod tests {
         ";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::List(vec![Object::Integer(15)])
-    );
+    assert_eq!(result, Object::List(vec![Object::Integer(15)]));
+  }
+
+  #[test]
+  fn test_tail_recursion() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "
+            (
+                (define sum-n
+                   (lambda (n a)
+                      (if (= n 0) a
+                          (sum-n (- n 1) (+ n a)))))
+                (sum-n 5000 2)
+            )
+        ";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::List(vec!(Object::Integer((12502502) as i64))));
   }
 }
