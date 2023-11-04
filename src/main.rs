@@ -43,23 +43,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if input.eq("exit") {
       break;
     }
-    let value = eval::eval(input.as_ref(), &mut env)?;
-    match value {
-      Object::Void => {}
-      Object::Integer(n) => println!("{}", n),
-      Object::Bool(b) => println!("{}", b),
-      Object::Symbol(s) => println!("{}", s),
-      Object::Lambda(params, body) => {
-        println!("Lambda(");
-        for param in params {
-          println!("{} ", param);
+    match eval::eval(input.as_ref(), &mut env) {
+      Ok(value) => match value {
+        Object::Void => {}
+        Object::Integer(n) => println!("{}", n),
+        Object::Bool(b) => println!("{}", b),
+        Object::Symbol(s) => println!("{}", s),
+        Object::Lambda(params, body) => {
+          println!("Lambda(");
+          for param in params {
+            println!("{} ", param);
+          }
+          println!(")");
+          for expression in body {
+            println!(" {}", expression);
+          }
         }
-        println!(")");
-        for expression in body {
-          println!(" {}", expression);
-        }
+        _ => println!("{}", value),
+      },
+      Err(e) => {
+        println!("{}", e);
       }
-      _ => println!("{}", value),
     }
   }
 

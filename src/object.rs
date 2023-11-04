@@ -3,8 +3,13 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object {
   Void,
+  If,
+  Keyword(String),
+  BinaryOp(String),
+  Float(f64),
   Integer(i64),
   Bool(bool),
+  String(String),
   Symbol(String),
   Lambda(Vec<String>, Vec<Object>),
   List(Vec<Object>),
@@ -38,6 +43,11 @@ impl fmt::Display for Object {
         }
         write!(f, ")")
       }
+      Object::Keyword(s) => write!(f, "{}", s),
+      Object::BinaryOp(s) => write!(f, "{}", s),
+      Object::Float(n) => write!(f, "{}", n),
+      Object::String(s) => write!(f, "{}", s),
+      Object::If => write!(f, "if"),
     }
   }
 }

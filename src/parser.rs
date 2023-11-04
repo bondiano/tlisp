@@ -36,7 +36,12 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
 
     let token = token.unwrap();
     match token {
+      Token::Keyword(k) => list.push(Object::Keyword(k)),
+      Token::If => list.push(Object::If),
+      Token::BinaryOp(b) => list.push(Object::BinaryOp(b)),
       Token::Integer(n) => list.push(Object::Integer(n)),
+      Token::Float(f) => list.push(Object::Float(f)),
+      Token::String(s) => list.push(Object::String(s)),
       Token::Symbol(s) => list.push(Object::Symbol(s)),
       Token::LParen => {
         tokens.push(Token::LParen);
@@ -55,7 +60,11 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
 pub fn parse(program: &str) -> Result<Object, ParseError> {
   let token_result = tokenize(program);
 
-  let mut tokens = token_result.into_iter().rev().collect::<Vec<_>>();
+  let mut tokens = token_result
+    .unwrap()
+    .into_iter()
+    .rev()
+    .collect::<Vec<Token>>();
   let parsed_list = parse_list(&mut tokens)?;
   Ok(parsed_list)
 }
@@ -70,7 +79,7 @@ mod lexer_tests {
     assert_eq!(
       list,
       Object::List(vec![
-        Object::Symbol("+".to_string()),
+        Object::BinaryOp("+".to_string()),
         Object::Integer(1),
         Object::Integer(2),
       ])
