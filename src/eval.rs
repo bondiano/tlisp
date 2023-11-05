@@ -18,6 +18,16 @@ fn eval_symbol(s: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object, St
   Ok(val.unwrap().clone())
 }
 
+fn eval_do(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  let mut result = Object::Void;
+  let mut new_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
+
+  for obj in list[1..].iter() {
+    result = eval_object(obj, &mut new_env)?;
+  }
+  Ok(result)
+}
+
 fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   if list.len() != 3 {
     return Err(format!("Invalid number of arguments for define"));
@@ -283,6 +293,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
       "define" => eval_define(&list, env),
       "lambda" => eval_function_definition(&list, env),
       "let" => eval_let(&list, env),
+      "do" => eval_do(&list, env),
       _ => Err(format!("Unknown keyword: {}", s)),
     },
     _ => {
@@ -384,114 +395,91 @@ mod tests {
   #[test]
   fn test_area_of_a_circle() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(
-                        (define r 10)
-                        (define pi 314)
-                        (* pi (* r r))
-                      )";
+    let program = "(do
+      (define r 10)
+      (define pi 314)
+      (* pi (* r r)))";
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::List(vec![Object::Integer((314 * 10 * 10) as i64)])
-    );
+    assert_eq!(result, Object::Integer((314 * 10 * 10) as i64));
   }
 
   #[test]
   fn test_sqr_function() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(
-                        (define sqr (lambda (r) (* r r)))
-                        (sqr 10)
-                       )";
+    let program = "(do
+      (define sqr (lambda (r) (* r r)))
+      (sqr 10))";
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::List(vec![Object::Integer((10 * 10) as i64)])
-    );
+    assert_eq!(result, Object::Integer((10 * 10) as i64));
   }
 
   #[test]
   fn test_fibonaci() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
-                (define fib (lambda (n) (if (< n 2) 1 (+ (fib (- n 1)) (fib (- n 2))))))
-                (fib 10)
-            )
-        ";
+    let program = "(do
+      (define fib (lambda (n) (if (< n 2) 1 (+ (fib (- n 1)) (fib (- n 2))))))
+        (fib 10))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::List(vec![Object::Integer((89) as i64)]));
+    assert_eq!(result, Object::Integer((89) as i64));
   }
 
   #[test]
   fn test_factorial() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
-                (define fact (lambda (n) (if (< n 1) 1 (* n (fact (- n 1))))))
-                (fact 5)
-            )
-        ";
+    let program = "(do
+      (define fact (lambda (n) (if (< n 1) 1 (* n (fact (- n 1))))))
+        (fact 5))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::List(vec![Object::Integer((120) as i64)]));
+    assert_eq!(result, Object::Integer((120) as i64));
   }
 
   #[test]
   fn test_circle_area_function() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
-                (define pi 3.14)
-                (define r 10)
-                (define sqr (lambda (r) (* r r)))
-                (define area (lambda (r) (* pi (sqr r))))
-                (area r)
-            )
-        ";
+    let program = "(do
+      (define pi 3.14)
+      (define r 10)
+      (define sqr (lambda (r) (* r r)))
+      (define area (lambda (r) (* pi (sqr r))))
+      (area r))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(
       result,
-      Object::List(vec![Object::Float(3.14 * 10.0 * 10.0)])
+      Object::Float(3.14 * 10.0 * 10.0)
     );
   }
 
   #[test]
   fn test_closure() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
-                (define add-n
-                   (lambda (n)
-                      (lambda (a) (+ n a))))
-                (define add-5 (add-n 5))
-                (add-5 10)
-            )
-        ";
+    let program = "(do
+      (define add-n
+          (lambda (n)
+            (lambda (a) (+ n a))))
+      (define add-5 (add-n 5))
+      (add-5 10))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::List(vec![Object::Integer(15)]));
+    assert_eq!(result, Object::Integer(15));
   }
 
   #[test]
   fn test_tail_recursion() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
-                (define sum-n
-                   (lambda (n a)
-                      (if (= n 0) a
-                          (sum-n (- n 1) (+ n a)))))
-                (sum-n 5000 2)
-            )
-        ";
+    let program = "(do
+      (define sum-n
+          (lambda (n a)
+            (if (= n 0) a
+                (sum-n (- n 1) (+ n a)))))
+      (sum-n 5000 2))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(
       result,
-      Object::List(vec!(Object::Integer((12502502) as i64)))
+      Object::Integer((12502502) as i64)
     );
   }
 
@@ -512,38 +500,34 @@ mod tests {
   #[test]
   fn test_let_tail() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-      ((define fact
-        (lambda (n)
-          (let ((fact-iter
-                (lambda (n a)
-                  (if (= n 0) a
-                      (fact-iter (- n 1) (* n a))))))
-            (fact-iter n 1))))
-          (fact 5))
-        ";
+    let program = "(do
+      (define fact
+      (lambda (n)
+        (let ((fact-iter
+              (lambda (n a)
+                (if (= n 0) a
+                    (fact-iter (- n 1) (* n a))))))
+          (fact-iter n 1))))
+        (fact 5))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::List(vec![Object::Integer(120)]));
+    assert_eq!(result, Object::Integer(120));
   }
 
   #[test]
   fn test_circle_area_no_lambda() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "
-            (
+    let program = "(do
                 (define pi 314)
                 (define r 10)
                 (define (sqr r) (* r r))
                 (define (area r) (* pi (sqr r)))
-                (area r)
-            )
-        ";
+                (area r))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(
       result,
-      Object::List(vec![Object::Integer((314 * 10 * 10) as i64)])
+      Object::Integer((314 * 10 * 10) as i64)
     );
   }
 }
