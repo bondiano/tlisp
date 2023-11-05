@@ -236,7 +236,7 @@ fn eval_eval(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
   let param = &list[1];
 
   match param {
-    Object::Quote(o) => return eval_object(&o, env),
+    Object::Quote(o) => eval_object(&o, env),
     _ => Err(format!("Invalid argument for eval")),
   }
 }
@@ -318,7 +318,9 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Symbol(s) => return eval_symbol(&s, &mut current_env),
       Object::Lambda(_params, _body, _func_env) => return Ok(Object::Void),
       Object::Quote(o) => return Ok(Object::Quote(o)),
-      _ => return Err(format!("Invalid object: {:?}", obj)),
+      Object::Operator(o) => return Ok(Object::Operator(o)),
+      Object::Keyword(k) => return  Ok(Object::Keyword(k)),
+      Object::If => return Ok(Object::If),
     }
   }
 }
@@ -486,6 +488,17 @@ mod tests {
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(6));
+  }
+
+  #[test]
+  fn test_eval_quoted_function() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      (define (sqr r) (* r r))
+      (eval '(sqr 10)))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(100));
   }
 
   #[test]

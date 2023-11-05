@@ -84,7 +84,44 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
               }
             }
           }
-          ref token => quoted_tokens.insert(0, token.clone()),
+          Token::Integer(ref n) => {
+            list.push(Object::Quote(Rc::new(Object::Integer(*n))));
+            continue;
+          }
+          Token::Float(ref f) => {
+            list.push(Object::Quote(Rc::new(Object::Float(*f))));
+            continue;
+          }
+          Token::Symbol(ref s) => {
+            list.push(Object::Quote(Rc::new(Object::Symbol(s.clone()))));
+            continue;
+          }
+          Token::Keyword(ref k) => {
+            list.push(Object::Quote(Rc::new(Object::Keyword(k.clone()))));
+            continue;
+          }
+          Token::Operator(ref b) => {
+            list.push(Object::Quote(Rc::new(Object::Operator(b.clone()))));
+            continue;
+          }
+          Token::String(ref s) => {
+            list.push(Object::Quote(Rc::new(Object::String(s.clone()))));
+            continue;
+          }
+          Token::If => {
+            list.push(Object::Quote(Rc::new(Object::If)));
+            continue;
+          }
+          Token::RParen => {
+            return Err(ParseError {
+              err: format!("Unexpected RParen"),
+            });
+          }
+          Token::Quote => {
+            return Err(ParseError {
+              err: format!("Unexpected Double Quote"),
+            });
+          }
         }
 
         let sub_list = parse_list(&mut quoted_tokens)?;

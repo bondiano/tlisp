@@ -107,7 +107,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
           } else {
             match word.as_str() {
               "define" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
-              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" => Token::Operator(word),
+              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" => Token::Operator(word),
               "if" => Token::If,
               _ => Token::Symbol(word),
             }
