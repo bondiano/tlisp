@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match eval::eval(input.as_ref(), &mut env) {
       Ok(value) => {
         println!("{}", value);
-      },
+      }
       Err(e) => {
         println!("{}", e);
       }

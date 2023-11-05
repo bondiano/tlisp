@@ -25,6 +25,18 @@ fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result
 
   let symbol = match &list[1] {
     Object::Symbol(s) => s,
+    Object::List(l) => {
+      let name = match &l[0] {
+        Object::Symbol(s) => s,
+        _ => return Err(format!("Invalid symbol for define")),
+      };
+
+      let params = Object::List(l[1..].to_vec());
+      let body = list[2].clone();
+      let lambda = eval_function_definition(&vec![Object::Void, params, body], env)?;
+      env.borrow_mut().set(&name, lambda);
+      return Ok(Object::Void);
+    }
     _ => return Err(format!("Invalid symbol for define")),
   };
 
@@ -104,7 +116,7 @@ fn eval_function_definition(
       for obj in list {
         match obj {
           Object::Symbol(s) => params.push(s.clone()),
-          _ => return Err(format!("Expected list of symbols")),
+          _ => return Err(format!("Invalid lambda parameter {:?}", params)),
         }
       }
 
@@ -241,7 +253,7 @@ fn eval_function_call(
     }
     _ => {
       return Err(format!("Not a lambda"));
-    },
+    }
   }
 }
 
@@ -497,7 +509,7 @@ mod tests {
     assert_eq!(result, Object::Integer(70));
   }
 
-    #[test]
+  #[test]
   fn test_let_tail() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "
@@ -513,5 +525,25 @@ mod tests {
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::List(vec![Object::Integer(120)]));
+  }
+
+  #[test]
+  fn test_circle_area_no_lambda() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "
+            (
+                (define pi 314)
+                (define r 10)
+                (define (sqr r) (* r r))
+                (define (area r) (* pi (sqr r)))
+                (area r)
+            )
+        ";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(
+      result,
+      Object::List(vec![Object::Integer((314 * 10 * 10) as i64)])
+    );
   }
 }

@@ -1,5 +1,5 @@
 use crate::object::Object;
-use std::{cell::RefCell, collections::HashMap, rc::Rc, fmt};
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, PartialEq, Default)]
 pub struct Environment {
@@ -52,10 +52,10 @@ impl fmt::Display for Environment {
     let _ = match self.parent {
       Some(ref parent) => {
         vars_str.push_str(&format!("parent: {}\n", parent.borrow()));
-      },
+      }
       None => {
         vars_str.push_str("parent: None\n");
-      },
+      }
     };
 
     write!(f, "{}", vars_str)
