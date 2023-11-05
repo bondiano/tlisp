@@ -52,6 +52,47 @@ fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box
   }
 }
 
+fn eval_let(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  let mut result = Object::Void;
+  let mut bindings_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
+
+  if list.len() < 3 {
+    return Err(format!("Invalid number of arguments for let"));
+  }
+
+  let bindings = match list[1].clone() {
+    Object::List(list) => list,
+    _ => return Err(format!("Invalid bindings for let")),
+  };
+
+  for binding in bindings {
+    let binding = match binding {
+      Object::List(list) => list,
+      _ => return Err(format!("Invalid binding for let")),
+    };
+
+    if binding.len() != 2 {
+      return Err(format!("Invalid binding for let"));
+    }
+
+    let symbol = match &binding[0] {
+      Object::Symbol(s) => s,
+      _ => return Err(format!("Invalid symbol for let")),
+    };
+
+    let value = eval_object(&binding[1], &mut bindings_env)?;
+    bindings_env.borrow_mut().set(symbol, value);
+  }
+
+  let mut new_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
+  new_env.borrow_mut().update(bindings_env);
+
+  for obj in list[2..].iter() {
+    result = eval_object(obj, &mut new_env)?;
+  }
+  Ok(result)
+}
+
 fn eval_function_definition(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
@@ -161,7 +202,7 @@ fn eval_binary_op(
         (Object::Float(l), Object::Integer(r)) => Ok(Object::Bool(*l != (*r) as f64)),
         (Object::String(l), Object::String(r)) => Ok(Object::Bool(l.cmp(&r) != Ordering::Equal)),
         _ => Err(format!("Invalid types for != operator {} {}", left, right)),
-      }
+      },
       _ => Err(format!("Invalid infix operator: {}", s)),
     },
     _ => Err(format!("Operator must be a symbol")),
@@ -174,6 +215,7 @@ fn eval_function_call(
   env: &mut Rc<RefCell<Environment>>,
 ) -> Result<(Box<Object>, Rc<RefCell<Environment>>), String> {
   let lambda = env.borrow_mut().get(s);
+
   if lambda.is_none() {
     return Err(format!("Unbound symbol: {}", s));
   }
@@ -219,6 +261,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
     Object::Keyword(s) => match s.as_str() {
       "define" => eval_define(&list, env),
       "lambda" => eval_function_definition(&list, env),
+      "let" => eval_let(&list, env),
       _ => Err(format!("Unknown keyword: {}", s)),
     },
     _ => {
@@ -259,7 +302,6 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
                 _ => new_list.push(result),
               }
             }
-
 
             let head = new_list.first().unwrap_or(&Object::Void);
             match head {
@@ -419,6 +461,41 @@ mod tests {
         ";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::List(vec!(Object::Integer((12502502) as i64))));
+    assert_eq!(
+      result,
+      Object::List(vec!(Object::Integer((12502502) as i64)))
+    );
+  }
+
+  #[test]
+  fn test_let() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "
+        (let ((x 2) (y 3))
+            (let ((x 7)
+                  (z (+ x y)))
+                (* z x)))
+        ";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(70));
+  }
+
+    #[test]
+  fn test_let_tail() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "
+      ((define fact
+        (lambda (n)
+          (let ((fact-iter
+                (lambda (n a)
+                  (if (= n 0) a
+                      (fact-iter (- n 1) (* n a))))))
+            (fact-iter n 1))))
+          (fact 5))
+        ";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::List(vec![Object::Integer(120)]));
   }
 }

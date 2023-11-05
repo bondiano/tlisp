@@ -27,3 +27,10 @@
   (lambda (n a)
     (if (= n 0) a
         (sum-n (- n 1) (+ n a)))))
+(define mul-n
+  (lambda (n a)
+    (if (= n 0) a
+        (mul-n (- n 1) (* n a)))))
+(define fact
+  (lambda (n)
+      (mul-n n 1)))
