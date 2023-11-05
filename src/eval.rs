@@ -214,25 +214,34 @@ fn eval_function_call(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
 ) -> Result<(Box<Object>, Rc<RefCell<Environment>>), String> {
-  let lambda = env.borrow_mut().get(s);
+  let symbol = env.borrow_mut().get(s);
 
-  if lambda.is_none() {
+  if symbol.is_none() {
     return Err(format!("Unbound symbol: {}", s));
   }
 
-  let lambda = lambda.unwrap();
+  let lambda = symbol.unwrap();
   match lambda {
     Object::Lambda(params, body, func_env) => {
       let new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
 
       for (i, param) in params.iter().enumerate() {
-        let val = eval_object(&list[i + 1], env)?;
-        new_env.borrow_mut().set(param, val);
+        let arg = list.get(i + 1);
+
+        match arg {
+          Some(arg) => {
+            let val = eval_object(&arg, env)?;
+            new_env.borrow_mut().set(param, val);
+          }
+          None => return Err(format!("Invalid number of arguments for {}", s)),
+        }
       }
 
       return Ok((Box::new(Object::List(body)), new_env.clone()));
     }
-    _ => Err(format!("{} is not a lambda", s)),
+    _ => {
+      return Err(format!("Not a lambda"));
+    },
   }
 }
 
@@ -286,8 +295,15 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
             continue;
           }
           Object::Symbol(s) => {
-            (current_obj, current_env) = eval_function_call(&s, &list, &mut current_env)?;
-            continue;
+            let symbol = eval_symbol(s, &mut current_env)?;
+
+            if let Object::Lambda(_, _, _) = symbol {
+              (current_obj, current_env) = eval_function_call(&s, &list, &mut current_env)?;
+              continue;
+            } else {
+              current_obj = Box::new(symbol);
+              continue;
+            }
           }
           Object::Lambda(_, _, _) => {
             (current_obj, current_env) = eval_anonymus_function_call(&list, &mut current_env)?;

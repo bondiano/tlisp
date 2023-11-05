@@ -20,7 +20,7 @@ pub enum Object {
 impl fmt::Display for Object {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      Object::Void => write!(f, "Void"),
+      Object::Void => write!(f, "#nil"),
       Object::Integer(n) => write!(f, "{}", n),
       Object::Bool(b) => write!(f, "{}", b),
       Object::Symbol(s) => write!(f, "{}", s),

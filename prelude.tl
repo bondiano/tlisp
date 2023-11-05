@@ -34,3 +34,11 @@
 (define fact
   (lambda (n)
       (mul-n n 1)))
+
+; -- Utility functions --
+(define apply
+  (lambda (f x)
+    (f x)))
+(define identity
+  (lambda (x)
+    (x)))

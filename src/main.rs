@@ -9,7 +9,6 @@ use std::io::Read;
 use std::{cell::RefCell, rc::Rc};
 
 use linefeed::{Interface, ReadResult};
-use object::Object;
 
 const PROMPT: &str = "tlisp> ";
 
@@ -43,16 +42,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if input.eq("exit") {
       break;
     }
-    match eval::eval(input.as_ref(), &mut env) {
-      Ok(value) => match value {
-        Object::Void => {}
-        Object::Integer(n) => println!("{}", n),
-        Object::Bool(b) => println!("{}", b),
-        Object::Symbol(s) => println!("{}", s),
-        Object::Lambda(_, _, _) => {
-          println!("{}", value)
+
+    if input.is_empty() {
+      continue;
+    }
+
+    if input.starts_with(".") {
+      let command = input.trim_start_matches(".");
+      match command {
+        "env" => {
+          println!("{}", &env.borrow());
         }
-        _ => println!("{}", value),
+        _ => {
+          println!("Unknown command: {}", command);
+        }
+      }
+      continue;
+    }
+
+    match eval::eval(input.as_ref(), &mut env) {
+      Ok(value) => {
+        println!("{}", value);
       },
       Err(e) => {
         println!("{}", e);
