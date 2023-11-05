@@ -22,7 +22,13 @@ impl fmt::Display for Object {
     match self {
       Object::Void => write!(f, "#nil"),
       Object::Integer(n) => write!(f, "{}", n),
-      Object::Bool(b) => write!(f, "{}", b),
+      Object::Bool(b) => {
+        if *b {
+          write!(f, "#t")
+        } else {
+          write!(f, "#f")
+        }
+      }
       Object::Symbol(s) => write!(f, "{}", s),
       Object::Lambda(params, body, _env) => {
         let body_str = body
