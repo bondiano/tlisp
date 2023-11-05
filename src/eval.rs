@@ -161,15 +161,7 @@ fn eval_binary_op(
         (Object::Float(l), Object::Integer(r)) => Ok(Object::Bool(*l != (*r) as f64)),
         (Object::String(l), Object::String(r)) => Ok(Object::Bool(l.cmp(&r) != Ordering::Equal)),
         _ => Err(format!("Invalid types for != operator {} {}", left, right)),
-      },
-      "and" => match (left, right) {
-        (Object::Bool(l), Object::Bool(r)) => Ok(Object::Bool(*l && *r)),
-        _ => Err(format!("Invalid types for & operator {} {}", left, right)),
-      },
-      "or" => match (left, right) {
-        (Object::Bool(l), Object::Bool(r)) => Ok(Object::Bool(*l || *r)),
-        _ => Err(format!("Invalid types for | operator {} {}", left, right)),
-      },
+      }
       _ => Err(format!("Invalid infix operator: {}", s)),
     },
     _ => Err(format!("Operator must be a symbol")),

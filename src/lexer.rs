@@ -76,6 +76,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
 
         tokens.push(Token::String(word));
       }
+      ';' => {
+        while chars.len() > 0 && chars[0] != '\n' {
+          chars.remove(0);
+        }
+      }
       _ => {
         let mut word = String::new();
 
