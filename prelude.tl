@@ -1,11 +1,13 @@
 ; -- Boolean functions --
 (define (not x) (if x #f #t))
+(define (!= x y) (not (= x y)))
 (define (xor x y) (if (and x y) #f (or x y)))
 (define (and x y) (if x y #f))
 (define (or x y) (if x #t y))
 (define (nand x y) (if (and x y) #f #t))
 (define (nor x y) (if (or x y) #f #t))
 (define (xnor x y) (if (xor x y) #f #t))
+(define (nil? x) (== x #nil))
 
 ; -- Arithmetic functions --
 (define (square x) (* x x))
