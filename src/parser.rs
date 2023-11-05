@@ -90,7 +90,7 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
         let sub_list = parse_list(&mut quoted_tokens)?;
 
         list.push(Object::Quote(Rc::new(sub_list)));
-      },
+      }
     }
   }
 
@@ -128,8 +128,11 @@ mod lexer_tests {
 
   #[test]
   fn test_quotation() {
-    let list = parse("(do
-      '(1 2 3))").unwrap();
+    let list = parse(
+      "(do
+      '(1 2 3))",
+    )
+    .unwrap();
     assert_eq!(
       list,
       Object::List(vec![

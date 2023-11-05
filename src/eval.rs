@@ -1,7 +1,8 @@
-use std::{cell::RefCell, cmp::Ordering, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::environment::Environment;
 use crate::object::Object;
+use crate::operators;
 use crate::parser::parse;
 
 fn eval_symbol(s: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
@@ -143,97 +144,29 @@ fn eval_function_definition(
   Ok(Object::Lambda(params, body, env.clone()))
 }
 
-fn eval_operator(
-  list: &Vec<Object>,
-  env: &mut Rc<RefCell<Environment>>,
-) -> Result<Object, String> {
-  if list.len() < 3 {
+fn eval_operator(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  if list.len() < 2 {
     return Err(format!("Invalid number of arguments for operators"));
   }
   let operator = list[0].clone();
-  let left = &eval_object(&list[1].clone(), env)?;
-  let right = &eval_object(&list[2].clone(), env)?;
+
+  let params = list[1..]
+    .to_vec()
+    .into_iter()
+    .map(|o| eval_object(&o, env))
+    .collect::<Result<Vec<Object>, String>>()?;
 
   match operator {
     Object::Operator(s) => match s.as_str() {
-      "+" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l + r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l + r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Float(*l as f64 + r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Float(l + *r as f64)),
-        (Object::String(l), Object::String(r)) => Ok(Object::String(l.to_owned() + &*r)),
-        _ => Err(format!("Invalid types for + operator {} {}", left, right)),
-      },
-      "-" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l - r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l - r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Float(*l as f64 - r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Float(l - *r as f64)),
-        _ => Err(format!("Invalid types for - operator {} {}", left, right)),
-      },
-      "*" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l * r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l * r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Float(*l as f64 * r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Float(l * (*r) as f64)),
-        _ => Err(format!("Invalid types for * operator {} {}", left, right)),
-      },
-      "/" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l / r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l / r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Float(*l as f64 / r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Float(l / (*r) as f64)),
-        _ => Err(format!("Invalid types for / operator {} {}", left, right)),
-      },
-      "%" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l % r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l % r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Float(*l as f64 % r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Float(l % (*r) as f64)),
-        _ => Err(format!("Invalid types for % operator {} {}", left, right)),
-      },
-      "<" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l < r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Bool(l < r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Bool((*l as f64) < *r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Bool(l < &(*r as f64))),
-        (Object::String(l), Object::String(r)) => Ok(Object::Bool(l.cmp(&r) == Ordering::Less)),
-        _ => Err(format!("Invalid types for < operator {} {}", left, right)),
-      },
-      ">" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l > r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Bool(l > r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Bool(*l as f64 > *r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Bool(l > &(*r as f64))),
-        (Object::String(l), Object::String(r)) => Ok(Object::Bool(l.cmp(&r) == Ordering::Greater)),
-        _ => Err(format!("Invalid types for > operator {} {}", left, right)),
-      },
-      "=" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l == r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Bool(l == r)),
-        (Object::Integer(l), Object::Float(r)) => Ok(Object::Bool(*l as f64 == *r)),
-        (Object::Float(l), Object::Integer(r)) => Ok(Object::Bool(*l == (*r) as f64)),
-        (Object::String(l), Object::String(r)) => Ok(Object::Bool(l == r)),
-        (Object::String(l), Object::Integer(r)) => Ok(Object::Bool(l == &r.to_string())),
-        (Object::Integer(l), Object::String(r)) => Ok(Object::Bool(&l.to_string() == r)),
-        (Object::String(l), Object::Float(r)) => Ok(Object::Bool(l == &r.to_string())),
-        (Object::Float(l), Object::String(r)) => Ok(Object::Bool(&l.to_string() == r)),
-        (Object::Bool(l), Object::Bool(r)) => Ok(Object::Bool(l == r)),
-        (Object::Void, Object::Void) => Ok(Object::Bool(true)),
-        (Object::Void, Object::Bool(r)) => Ok(Object::Bool(!r)),
-        (Object::Bool(l), Object::Void) => Ok(Object::Bool(!l)),
-        (_, Object::Bool(r)) => Ok(Object::Bool(*r)),
-        (Object::Bool(l), _) => Ok(Object::Bool(*l)),
-        _ => Ok(Object::Bool(false)),
-      },
-      "==" => match (left, right) {
-        (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l == r)),
-        (Object::Bool(l), Object::Bool(r)) => Ok(Object::Bool(l == r)),
-        (Object::Float(l), Object::Float(r)) => Ok(Object::Bool(l == r)),
-        (Object::String(l), Object::String(r)) => Ok(Object::Bool(l == r)),
-        (Object::Void, Object::Void) => Ok(Object::Bool(true)),
-        _ => Ok(Object::Bool(false)),
-      },
+      "+" => operators::sum(params),
+      "-" => operators::sub(params),
+      "*" => operators::mult(params),
+      "/" => operators::div(params),
+      "%" => operators::mod_(params),
+      "<" => operators::lt(params),
+      ">" => operators::gt(params),
+      "=" => operators::eq(params),
+      "==" => operators::strict_eq(params),
       _ => Err(format!("Invalid infix operator: {}", s)),
     },
     _ => Err(format!("Operator must be a symbol")),
@@ -535,13 +468,43 @@ mod tests {
   fn test_circle_area_no_lambda() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
-                (define pi 314)
-                (define r 10)
-                (define (sqr r) (* r r))
-                (define (area r) (* pi (sqr r)))
-                (area r))";
+      (define pi 314)
+      (define r 10)
+      (define (sqr r) (* r r))
+      (define (area r) (* pi (sqr r)))
+      (area r))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer((314 * 10 * 10) as i64));
+  }
+
+  #[test]
+  fn test_eval_to_eval_quoted() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      (eval '(+ 1 2 3))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(6));
+  }
+
+  #[test]
+  fn test_multi_arguments_operators() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      (= 1 1 1 1 1 1 1 1 1 1 1 1 1 1))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Bool(true));
+
+    let program = "(do
+      (= 1 1 1 1 1 1 1 1 1 1 1 1 1 2))";
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Bool(false));
+
+    let program = "(do
+      (+ 10 11 12 13 14 15 16 17 18 19 20))";
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(165));
   }
 }

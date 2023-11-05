@@ -1,22 +1,10 @@
 ; -- Boolean functions --
 (define (not x) (if x #f #t))
-(define (!= x y) (not (= x y)))
-(define (xor x y) (if (and x y) #f (or x y)))
-(define (and x y) (if x y #f))
-(define (or x y) (if x #t y))
-(define (nand x y) (if (and x y) #f #t))
-(define (nor x y) (if (or x y) #f #t))
-(define (xnor x y) (if (xor x y) #f #t))
 (define (nil? x) (== x #nil))
 
 ; -- Arithmetic functions --
 (define (square x) (* x x))
 (define (cube x) (* x x x))
-(define (add x y) (+ x y))
-(define (sub x y) (- x y))
-(define (mul x y) (* x y))
-(define (div x y) (/ x y))
-(define (mod x y) (% x y))
 (define (inc x) (+ x 1))
 (define (dec x) (- x 1))
 (define (abs x) (if (< x 0) (- x) x))
@@ -35,7 +23,5 @@
       (mul-n n 1))
 
 ; -- Utility functions --
-(define (apply f x)
-    (f x))
 (define (identity x)
     (x))

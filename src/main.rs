@@ -2,6 +2,7 @@ mod environment;
 mod eval;
 mod lexer;
 mod object;
+mod operators;
 mod parser;
 
 use std::fs::File;
