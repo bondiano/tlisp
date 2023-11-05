@@ -41,6 +41,7 @@ fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box
   let cond_obj = eval_object(&list[1], env)?;
   let cond = match cond_obj {
     Object::Bool(b) => b,
+    Object::Void => false,
     _ => return Err(format!("Condition must be a boolean")),
   };
 
@@ -147,6 +148,10 @@ fn eval_binary_op(
       "=" => match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l == r)),
         (Object::String(l), Object::String(r)) => Ok(Object::Bool(l == r)),
+        (Object::Bool(l), Object::Bool(r)) => Ok(Object::Bool(l == r)),
+        (Object::Void, Object::Void) => Ok(Object::Bool(true)),
+        (Object::Void, Object::Bool(r)) => Ok(Object::Bool(!r)),
+        (Object::Bool(l), Object::Void) => Ok(Object::Bool(!l)),
         _ => Err(format!("Invalid types for = operator {} {}", left, right)),
       },
       "!=" => match (left, right) {
