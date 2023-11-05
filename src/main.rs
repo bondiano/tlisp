@@ -61,7 +61,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       continue;
     }
 
-    let input = format!("(do {})", input);
     match eval::eval(input.as_ref(), &mut env) {
       Ok(value) => {
         println!("{}", value);
@@ -70,6 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", e);
       }
     }
+
+    reader.add_history_unique(input);
   }
 
   Ok(())

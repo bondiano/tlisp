@@ -237,6 +237,7 @@ fn eval_eval(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
 
   match param {
     Object::Quote(o) => eval_object(&o, env),
+    Object::List(l) => eval_object(&Object::List(l.clone()), env),
     _ => Err(format!("Invalid argument for eval")),
   }
 }
@@ -300,11 +301,9 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
 
             let head = new_list.first().unwrap_or(&Object::Void);
             match head {
-              Object::Lambda(_, _, _) => {
-                return eval_object(&Object::List(new_list), &mut current_env);
-              }
+              Object::Void => return Ok(Object::Void),
               _ => {
-                return Ok(Object::List(new_list));
+                return eval_object(&Object::List(new_list), &mut current_env);
               }
             }
           }
@@ -335,7 +334,7 @@ pub fn eval(program: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object,
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+use super::*;
 
   #[test]
   fn test_simple_add() {
@@ -519,5 +518,15 @@ mod tests {
       (+ 10 11 12 13 14 15 16 17 18 19 20))";
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(165));
+  }
+
+  #[test]
+  fn test_evaluate_operator_expression() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      ((if #f = *) 3 4))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(12));
   }
 }
