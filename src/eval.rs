@@ -143,19 +143,19 @@ fn eval_function_definition(
   Ok(Object::Lambda(params, body, env.clone()))
 }
 
-fn eval_binary_op(
+fn eval_operator(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
 ) -> Result<Object, String> {
-  if list.len() != 3 {
-    return Err(format!("Invalid number of arguments for infix operator"));
+  if list.len() < 3 {
+    return Err(format!("Invalid number of arguments for operators"));
   }
   let operator = list[0].clone();
   let left = &eval_object(&list[1].clone(), env)?;
   let right = &eval_object(&list[2].clone(), env)?;
 
   match operator {
-    Object::BinaryOp(s) => match s.as_str() {
+    Object::Operator(s) => match s.as_str() {
       "+" => match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Ok(Object::Integer(l + r)),
         (Object::Float(l), Object::Float(r)) => Ok(Object::Float(l + r)),
@@ -224,7 +224,7 @@ fn eval_binary_op(
         (Object::Bool(l), Object::Void) => Ok(Object::Bool(!l)),
         (_, Object::Bool(r)) => Ok(Object::Bool(*r)),
         (Object::Bool(l), _) => Ok(Object::Bool(*l)),
-        _ => Ok(Object::Bool(false))
+        _ => Ok(Object::Bool(false)),
       },
       "==" => match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Ok(Object::Bool(l == r)),
@@ -232,8 +232,8 @@ fn eval_binary_op(
         (Object::Float(l), Object::Float(r)) => Ok(Object::Bool(l == r)),
         (Object::String(l), Object::String(r)) => Ok(Object::Bool(l == r)),
         (Object::Void, Object::Void) => Ok(Object::Bool(true)),
-        _ => Ok(Object::Bool(false))
-      }
+        _ => Ok(Object::Bool(false)),
+      },
       _ => Err(format!("Invalid infix operator: {}", s)),
     },
     _ => Err(format!("Operator must be a symbol")),
@@ -295,6 +295,19 @@ fn eval_anonymus_function_call(
   }
 }
 
+fn eval_eval(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  if list.len() != 2 {
+    return Err(format!("Invalid number of arguments for eval"));
+  }
+
+  let param = &list[1];
+
+  match param {
+    Object::Quote(o) => return eval_object(&o, env),
+    _ => Err(format!("Invalid argument for eval")),
+  }
+}
+
 fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   let head = &list[0];
   match head {
@@ -303,6 +316,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
       "lambda" => eval_function_definition(&list, env),
       "let" => eval_let(&list, env),
       "do" => eval_do(&list, env),
+      "eval" => eval_eval(&list, env),
       _ => Err(format!("Unknown keyword: {}", s)),
     },
     _ => {
@@ -320,7 +334,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::List(list) => {
         let head = &list[0];
         match head {
-          Object::BinaryOp(_op) => return eval_binary_op(&list, &mut current_env),
+          Object::Operator(_op) => return eval_operator(&list, &mut current_env),
           Object::Keyword(_k) => return eval_keyword(&list, &mut current_env),
           Object::If => {
             current_obj = eval_if(&list, &mut current_env)?;
@@ -370,6 +384,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::String(s) => return Ok(Object::String(s.to_string())),
       Object::Symbol(s) => return eval_symbol(&s, &mut current_env),
       Object::Lambda(_params, _body, _func_env) => return Ok(Object::Void),
+      Object::Quote(o) => return Ok(Object::Quote(o)),
       _ => return Err(format!("Invalid object: {:?}", obj)),
     }
   }
@@ -455,10 +470,7 @@ mod tests {
       (area r))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::Float(3.14 * 10.0 * 10.0)
-    );
+    assert_eq!(result, Object::Float(3.14 * 10.0 * 10.0));
   }
 
   #[test]
@@ -486,10 +498,7 @@ mod tests {
       (sum-n 5000 2))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::Integer((12502502) as i64)
-    );
+    assert_eq!(result, Object::Integer((12502502) as i64));
   }
 
   #[test]
@@ -499,8 +508,7 @@ mod tests {
         (let ((x 2) (y 3))
             (let ((x 7)
                   (z (+ x y)))
-                (* z x)))
-        ";
+                (* z x)))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(70));
@@ -534,9 +542,6 @@ mod tests {
                 (area r))";
 
     let result = eval(program, &mut env).unwrap();
-    assert_eq!(
-      result,
-      Object::Integer((314 * 10 * 10) as i64)
-    );
+    assert_eq!(result, Object::Integer((314 * 10 * 10) as i64));
   }
 }

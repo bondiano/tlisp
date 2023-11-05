@@ -3,6 +3,7 @@ use crate::object::Object;
 
 use std::error::Error;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -35,10 +36,11 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
     }
 
     let token = token.unwrap();
+
     match token {
       Token::Keyword(k) => list.push(Object::Keyword(k)),
       Token::If => list.push(Object::If),
-      Token::BinaryOp(b) => list.push(Object::BinaryOp(b)),
+      Token::Operator(b) => list.push(Object::Operator(b)),
       Token::Integer(n) => list.push(Object::Integer(n)),
       Token::Float(f) => list.push(Object::Float(f)),
       Token::String(s) => list.push(Object::String(s)),
@@ -51,6 +53,44 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
       Token::RParen => {
         return Ok(Object::List(list));
       }
+      Token::Quote => {
+        let quoted_token = tokens.pop();
+        if quoted_token == None {
+          return Err(ParseError {
+            err: format!("Insufficient tokens"),
+          });
+        }
+
+        let mut quoted_tokens = vec![quoted_token.unwrap()];
+
+        match quoted_tokens[0] {
+          Token::LParen => {
+            let mut paren_count = 1;
+            while paren_count > 0 {
+              let token = tokens.pop();
+              if token == None {
+                return Err(ParseError {
+                  err: format!("Insufficient tokens"),
+                });
+              }
+
+              let token = token.unwrap();
+              quoted_tokens.insert(0, token.clone());
+
+              match token {
+                Token::LParen => paren_count += 1,
+                Token::RParen => paren_count -= 1,
+                _ => (),
+              }
+            }
+          }
+          ref token => quoted_tokens.insert(0, token.clone()),
+        }
+
+        let sub_list = parse_list(&mut quoted_tokens)?;
+
+        list.push(Object::Quote(Rc::new(sub_list)));
+      },
     }
   }
 
@@ -79,10 +119,27 @@ mod lexer_tests {
     assert_eq!(
       list,
       Object::List(vec![
-        Object::BinaryOp("+".to_string()),
+        Object::Operator("+".to_string()),
         Object::Integer(1),
         Object::Integer(2),
       ])
     );
+  }
+
+  #[test]
+  fn test_quotation() {
+    let list = parse("(do
+      '(1 2 3))").unwrap();
+    assert_eq!(
+      list,
+      Object::List(vec![
+        Object::Keyword("do".to_string()),
+        Object::Quote(Rc::new(Object::List(vec![
+          Object::Integer(1),
+          Object::Integer(2),
+          Object::Integer(3),
+        ])))
+      ])
+    )
   }
 }

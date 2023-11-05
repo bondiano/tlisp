@@ -6,8 +6,9 @@ use crate::environment::Environment;
 pub enum Object {
   Void,
   If,
+  Quote(Rc<Object>),
   Keyword(String),
-  BinaryOp(String),
+  Operator(String),
   Float(f64),
   Integer(i64),
   Bool(bool),
@@ -53,9 +54,10 @@ impl fmt::Display for Object {
         Ok(())
       }
       Object::Keyword(s) => write!(f, "{}", s),
-      Object::BinaryOp(s) => write!(f, "{}", s),
+      Object::Operator(s) => write!(f, "{}", s),
       Object::Float(n) => write!(f, "{}", n),
       Object::String(s) => write!(f, "{}", s),
+      Object::Quote(o) => write!(f, "'{}", o),
       Object::If => write!(f, "if"),
     }
   }

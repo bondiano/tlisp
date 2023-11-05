@@ -1,14 +1,15 @@
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
   Integer(i64),
   Float(f64),
   String(String),
-  BinaryOp(String),
+  Operator(String),
   Keyword(String),
   Symbol(String),
+  Quote,
   If,
   LParen,
   RParen,
@@ -21,9 +22,10 @@ impl fmt::Display for Token {
       (match self {
         Integer(n) => format!("{}", n),
         Float(n) => format!("{}", n),
-        BinaryOp(s) => format!("{}", s),
+        Operator(s) => format!("{}", s),
         String(s) => format!("{}", s),
         Symbol(s) => format!("{}", s),
+        Quote => format!("'"),
         LParen => format!("("),
         RParen => format!(")"),
         If => format!("if"),
@@ -81,6 +83,9 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
           chars.remove(0);
         }
       }
+      '\'' => {
+        tokens.push(Token::Quote);
+      }
       _ => {
         let mut word = String::new();
 
@@ -101,8 +106,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
             Token::Float(f)
           } else {
             match word.as_str() {
-              "define" | "lambda" | "let" | "do" => Token::Keyword(word),
-              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" => Token::BinaryOp(word),
+              "define" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
+              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" => Token::Operator(word),
               "if" => Token::If,
               _ => Token::Symbol(word),
             }
@@ -129,11 +134,28 @@ mod lexer_tests {
       tokens,
       vec![
         Token::LParen,
-        Token::BinaryOp("+".to_string()),
+        Token::Operator("+".to_string()),
         Token::Integer(2),
         Token::Integer(2),
         Token::RParen,
       ]
     );
+  }
+
+  #[test]
+  fn test_quotation() {
+    let program = "'(1 2 3)";
+    let tokens = tokenize(program).unwrap();
+    assert_eq!(
+      tokens,
+      vec![
+        Token::Quote,
+        Token::LParen,
+        Token::Integer(1),
+        Token::Integer(2),
+        Token::Integer(3),
+        Token::RParen,
+      ]
+    )
   }
 }
