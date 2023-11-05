@@ -25,25 +25,26 @@ impl fmt::Display for Object {
       Object::Bool(b) => write!(f, "{}", b),
       Object::Symbol(s) => write!(f, "{}", s),
       Object::Lambda(params, body, _env) => {
-        write!(f, "Lambda(")?;
-        for param in params {
-          write!(f, "{} ", param)?;
-        }
-        write!(f, ")")?;
-        for expr in (*body).iter() {
-          write!(f, " {}", expr)?;
-        }
+        let body_str = body
+          .iter()
+          .map(|x| format!("{}", x))
+          .collect::<Vec<String>>()
+          .join(" ");
+        let params_str = params.join(" ");
+        write!(f, "(lambda ({}) ({}))", params_str, body_str)?;
+
         Ok(())
       }
       Object::List(list) => {
-        write!(f, "(")?;
-        for (i, obj) in (*list).iter().enumerate() {
-          if i > 0 {
-            write!(f, " ")?;
-          }
-          write!(f, "{}", obj)?;
-        }
-        write!(f, ")")
+        let list_str = list
+          .iter()
+          .map(|x| format!("{}", x))
+          .collect::<Vec<String>>()
+          .join(" ");
+
+        write!(f, "({})", list_str)?;
+
+        Ok(())
       }
       Object::Keyword(s) => write!(f, "{}", s),
       Object::BinaryOp(s) => write!(f, "{}", s),

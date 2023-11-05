@@ -49,15 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Object::Integer(n) => println!("{}", n),
         Object::Bool(b) => println!("{}", b),
         Object::Symbol(s) => println!("{}", s),
-        Object::Lambda(params, body, _) => {
-          print!("lambda(");
-          for param in params {
-            print!("{} ", param);
-          }
-          print!(")");
-          for expression in body {
-            println!(" {}", expression);
-          }
+        Object::Lambda(_, _, _) => {
+          println!("{}", value)
         }
         _ => println!("{}", value),
       },
