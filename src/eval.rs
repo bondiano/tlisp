@@ -150,23 +150,21 @@ fn eval_operator(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resu
   }
   let operator = list[0].clone();
 
-  let params = list[1..]
-    .to_vec()
-    .into_iter()
-    .map(|o| eval_object(&o, env))
-    .collect::<Result<Vec<Object>, String>>()?;
+  let mut params = list[1..].into_iter().map(|o| eval_object(&o, env));
 
   match operator {
     Object::Operator(s) => match s.as_str() {
-      "+" => operators::sum(params),
-      "-" => operators::sub(params),
-      "*" => operators::mult(params),
-      "/" => operators::div(params),
-      "%" => operators::mod_(params),
-      "<" => operators::lt(params),
-      ">" => operators::gt(params),
-      "=" => operators::eq(params),
-      "==" => operators::strict_eq(params),
+      "+" => operators::sum(&mut params),
+      "-" => operators::sub(&mut params),
+      "*" => operators::mult(&mut params),
+      "/" => operators::div(&mut params),
+      "%" => operators::mod_(&mut params),
+      "<" => operators::lt(&mut params),
+      ">" => operators::gt(&mut params),
+      "=" => operators::eq(&mut params),
+      "==" => operators::strict_eq(&mut params),
+      "and" => operators::and(&mut params),
+      "or" => operators::or(&mut params),
       _ => Err(format!("Invalid infix operator: {}", s)),
     },
     _ => Err(format!("Operator must be a symbol")),
@@ -306,8 +304,8 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
               Object::Bool(_) | Object::Integer(_) | Object::Float(_) | Object::String(_) => {
                 Err(format!("Invalid head of list to call: {}", head))
               }
-              _ => eval_object(&Object::List(new_list), &mut current_env)
-            }
+              _ => eval_object(&Object::List(new_list), &mut current_env),
+            };
           }
         }
       }
@@ -320,7 +318,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Lambda(_params, _body, _func_env) => return Ok(Object::Void),
       Object::Quote(o) => return Ok(Object::Quote(o)),
       Object::Operator(o) => return Ok(Object::Operator(o)),
-      Object::Keyword(k) => return  Ok(Object::Keyword(k)),
+      Object::Keyword(k) => return Ok(Object::Keyword(k)),
       Object::If => return Ok(Object::If),
     }
   }
@@ -336,7 +334,7 @@ pub fn eval(program: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object,
 
 #[cfg(test)]
 mod tests {
-use super::*;
+  use super::*;
 
   #[test]
   fn test_simple_add() {
@@ -525,5 +523,43 @@ use super::*;
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(12));
+  }
+
+  #[test]
+  fn test_or_operator() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(or 1 2 3)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(1));
+
+    let program = "(or #f 2 3)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(2));
+
+    let program = "(or #f #nil 3)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(3));
+  }
+
+    #[test]
+  fn test_and_operator() {
+    let mut env: Rc<RefCell<Environment>> = Rc::new(RefCell::new(Environment::new()));
+    let program = "(and 1 2 3)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(3));
+
+    let program = "(and 1 2 #f)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Bool(false));
+
+    let program = "(and 1 #nil #f)";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Void);
   }
 }

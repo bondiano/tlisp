@@ -1,25 +1,23 @@
 use crate::object::Object;
 
-pub fn sum(params: Vec<Object>) -> Result<Object, String> {
-  let mut sum: Object = params[0].clone();
+pub fn sum<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut sum = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
-
-  for param in rest_params {
+  for param in params {
     sum = match sum {
-      Object::Integer(n) => match param {
+      Object::Integer(n) => match param? {
         Object::Integer(m) => Object::Integer(m + n),
         Object::Float(m) => Object::Float(m + n as f64),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => Object::Float(*m as f64 + n),
+      Object::Float(n) => match param? {
+        Object::Integer(m) => Object::Float(m as f64 + n),
         Object::Float(m) => Object::Float(m + n),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::String(s) => match param {
+      Object::String(s) => match param? {
         Object::String(t) => Object::String(format!("{}{}", s, t)),
-        _ => return Err(format!("Expected string, found {}", param)),
+        param => return Err(format!("Expected string, found {}", param)),
       },
       _ => return Err(format!("{} could not be added", sum)),
     }
@@ -28,10 +26,12 @@ pub fn sum(params: Vec<Object>) -> Result<Object, String> {
   Ok(sum)
 }
 
-pub fn sub(params: Vec<Object>) -> Result<Object, String> {
-  let mut diff: Object = params[0].clone();
+pub fn sub<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut diff: Object = params.next().unwrap()?;
 
-  if params.len() == 1 {
+  let next = params.next();
+
+  if next.is_none() {
     diff = match diff {
       Object::Integer(n) => Object::Integer(-n),
       Object::Float(n) => Object::Float(-n),
@@ -41,19 +41,19 @@ pub fn sub(params: Vec<Object>) -> Result<Object, String> {
     return Ok(diff);
   }
 
-  let rest_params = &params[1..];
+  let rest_params = std::iter::once(next.unwrap()).chain(params);
 
   for param in rest_params {
     diff = match diff {
-      Object::Integer(n) => match param {
+      Object::Integer(n) => match param? {
         Object::Integer(m) => Object::Integer(n - m),
         Object::Float(m) => Object::Float(n as f64 - m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => Object::Float(n - *m as f64),
+      Object::Float(n) => match param? {
+        Object::Integer(m) => Object::Float(n - m as f64),
         Object::Float(m) => Object::Float(n - m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
       _ => return Err(format!("{} could not be subtracted", diff)),
     }
@@ -62,22 +62,20 @@ pub fn sub(params: Vec<Object>) -> Result<Object, String> {
   Ok(diff)
 }
 
-pub fn mult(params: Vec<Object>) -> Result<Object, String> {
-  let mut product: Object = params[0].clone();
+pub fn mult<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut product: Object = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
-
-  for param in rest_params {
+  for param in params {
     product = match product {
-      Object::Integer(n) => match param {
+      Object::Integer(n) => match param? {
         Object::Integer(m) => Object::Integer(m * n),
         Object::Float(m) => Object::Float(m * n as f64),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => Object::Float(*m as f64 * n),
+      Object::Float(n) => match param? {
+        Object::Integer(m) => Object::Float(m as f64 * n),
         Object::Float(m) => Object::Float(m * n),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
       _ => return Err(format!("{} could not be multiplied", product)),
     }
@@ -86,22 +84,20 @@ pub fn mult(params: Vec<Object>) -> Result<Object, String> {
   Ok(product)
 }
 
-pub fn div(params: Vec<Object>) -> Result<Object, String> {
-  let mut quotient: Object = params[0].clone();
+pub fn div<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut quotient: Object = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
-
-  for param in rest_params {
+  for param in params {
     quotient = match quotient {
-      Object::Integer(n) => match param {
+      Object::Integer(n) => match param? {
         Object::Integer(m) => Object::Integer(n / m),
         Object::Float(m) => Object::Float(n as f64 / m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => Object::Float(n / *m as f64),
+      Object::Float(n) => match param? {
+        Object::Integer(m) => Object::Float(n / m as f64),
         Object::Float(m) => Object::Float(n / m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
       _ => return Err(format!("{} could not be divided", quotient)),
     }
@@ -110,22 +106,20 @@ pub fn div(params: Vec<Object>) -> Result<Object, String> {
   Ok(quotient)
 }
 
-pub fn mod_(params: Vec<Object>) -> Result<Object, String> {
-  let mut remainder: Object = params[0].clone();
+pub fn mod_<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut remainder: Object = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
-
-  for param in rest_params {
+  for param in params {
     remainder = match remainder {
-      Object::Integer(n) => match param {
+      Object::Integer(n) => match param? {
         Object::Integer(m) => Object::Integer(n % m),
         Object::Float(m) => Object::Float(n as f64 % m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => Object::Float(n % *m as f64),
+      Object::Float(n) => match param? {
+        Object::Integer(m) => Object::Float(n % m as f64),
         Object::Float(m) => Object::Float(n % m),
-        _ => return Err(format!("Expected int or float, found {}", param)),
+        param => return Err(format!("Expected int or float, found {}", param)),
       },
       _ => return Err(format!("{} could not be divided", remainder)),
     }
@@ -134,24 +128,36 @@ pub fn mod_(params: Vec<Object>) -> Result<Object, String> {
   Ok(remainder)
 }
 
-pub fn lt(params: Vec<Object>) -> Result<Object, String> {
+pub fn lt<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
   let mut result = true;
 
-  let mut prev = params[0].clone();
+  let mut prev = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
+  for param in params {
+    let next = param?;
 
-  for param in rest_params {
     result = match prev {
-      Object::Integer(n) => match param {
-        Object::Integer(m) => n < *m,
-        Object::Float(m) => n < *m as i64,
-        _ => return Err(format!("Expected int or float, found {}", param)),
+      Object::Integer(n) => match next {
+        Object::Integer(m) => {
+          prev = next;
+          n < m
+        }
+        Object::Float(m) => {
+          prev = next;
+          n < m as i64
+        }
+        v => return Err(format!("Expected int or float, found {}", v)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => n < *m as f64,
-        Object::Float(m) => n < *m,
-        _ => return Err(format!("Expected int or float, found {}", param)),
+      Object::Float(n) => match next {
+        Object::Integer(m) => {
+          prev = next;
+          n < m as f64
+        }
+        Object::Float(m) => {
+          prev = next;
+          n < m
+        }
+        v => return Err(format!("Expected int or float, found {}", v)),
       },
       _ => return Err(format!("{} could not be compared", prev)),
     };
@@ -159,31 +165,43 @@ pub fn lt(params: Vec<Object>) -> Result<Object, String> {
     if !result {
       break;
     }
-
-    prev = param.clone();
   }
 
   Ok(Object::Bool(result))
 }
 
-pub fn gt(params: Vec<Object>) -> Result<Object, String> {
+pub fn gt<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
   let mut result = true;
 
-  let mut prev = params[0].clone();
+  let mut prev = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
+  for param in params {
+    let next = param?;
 
-  for param in rest_params {
     result = match prev {
-      Object::Integer(n) => match param {
-        Object::Integer(m) => n > *m,
-        Object::Float(m) => n > *m as i64,
-        _ => return Err(format!("Expected int or float, found {}", param)),
+      Object::Integer(n) => match next {
+        Object::Integer(m) => {
+          prev = next;
+          n > m
+        }
+        Object::Float(m) => {
+          n > {
+            prev = next;
+            m as i64
+          }
+        }
+        v => return Err(format!("Expected int or float, found {}", v)),
       },
-      Object::Float(n) => match param {
-        Object::Integer(m) => n > *m as f64,
-        Object::Float(m) => n > *m,
-        _ => return Err(format!("Expected int or float, found {}", param)),
+      Object::Float(n) => match next {
+        Object::Integer(m) => {
+          prev = next;
+          n > m as f64
+        }
+        Object::Float(m) => {
+          prev = next;
+          n > m
+        }
+        v => return Err(format!("Expected int or float, found {}", v)),
       },
       _ => return Err(format!("{} could not be compared", prev)),
     };
@@ -191,100 +209,129 @@ pub fn gt(params: Vec<Object>) -> Result<Object, String> {
     if !result {
       break;
     }
-
-    prev = param.clone();
   }
 
   Ok(Object::Bool(result))
 }
 
-pub fn eq(params: Vec<Object>) -> Result<Object, String> {
+pub fn eq<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
   let mut result = true;
 
-  let mut prev = params[0].clone();
+  let mut prev = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
+  for param in params {
+    let next = param?;
 
-  for param in rest_params {
-    result = match prev {
-      Object::Integer(n) => match param {
-        Object::Integer(m) => n == *m,
-        Object::Float(m) => n == *m as i64,
-        Object::Bool(_) => true,
-        _ => false,
-      },
-      Object::Float(n) => match param {
-        Object::Integer(m) => n == *m as f64,
-        Object::Float(m) => n == *m,
-        Object::Bool(_) => true,
-        _ => false,
-      },
-      Object::Bool(n) => match param {
-        Object::Bool(m) => n == *m,
-        Object::Void => !n,
-        _ => true,
-      },
-      Object::String(n) => match param {
-        Object::String(m) => n == *m,
-        Object::Bool(b) => *b,
-        _ => false,
-      },
-      Object::Void => match param {
-        Object::Void => true,
-        Object::Bool(b) => !b,
-        _ => false,
-      },
-      _ => return Err(format!("{} could not be compared", prev)),
+    let updated_prev = match (&prev, &next) {
+      (Object::Integer(n), Object::Integer(m)) => n == m,
+      (Object::Integer(n), Object::Float(m)) => *n == *m as i64,
+      (Object::Integer(_), Object::Bool(_)) => true,
+      (Object::Integer(_), _) => false,
+      (Object::Float(n), Object::Integer(m)) => *n == *m as f64,
+      (Object::Float(n), Object::Float(m)) => n == m,
+      (Object::Float(_), Object::Bool(_)) => true,
+      (Object::Float(_), _) => false,
+      (Object::Bool(n), Object::Bool(m)) => n == m,
+      (Object::Bool(n), Object::Void) => !n,
+      (Object::Bool(b), Object::String(_)) => *b,
+      (Object::Bool(_), _) => false,
+      (Object::String(n), Object::String(m)) => n == m,
+      (Object::String(_), Object::Bool(b)) => *b,
+      (Object::String(_), _) => false,
+      (Object::Void, Object::Void) => true,
+      (Object::Void, Object::Bool(b)) => !b,
+      (Object::Void, _) => false,
+      (_, _) => return Err(format!("{} could not be compared", prev)),
     };
 
-    if !result {
+    if !updated_prev {
+      result = false;
       break;
     }
 
-    prev = param.clone();
+    prev = next;
   }
 
   Ok(Object::Bool(result))
 }
 
-pub fn strict_eq(params: Vec<Object>) -> Result<Object, String> {
+pub fn strict_eq<I: Iterator<Item = Result<Object, String>>>(
+  params: &mut I,
+) -> Result<Object, String> {
   let mut result = true;
 
-  let mut prev = params[0].clone();
+  let mut prev = params.next().unwrap()?;
 
-  let rest_params = &params[1..];
+  for param in params {
+    let next = param?;
 
-  for param in rest_params {
-    result = match prev {
-      Object::Integer(n) => match param {
-        Object::Integer(m) => n == *m,
-        _ => false,
-      },
-      Object::Float(n) => match param {
-        Object::Float(m) => n == *m,
-        _ => false,
-      },
-      Object::Bool(n) => match param {
-        Object::Bool(m) => n == *m,
-        _ => false,
-      },
-      Object::String(n) => match param {
-        Object::String(m) => n == *m,
-        _ => false,
-      },
-      Object::Void => match param {
-        Object::Void => true,
-        _ => false,
-      },
+    let updated_prev = match (&prev, &next) {
+      (Object::Integer(n), Object::Integer(m)) => n == m,
+      (Object::Integer(_), _) => false,
+      (Object::Float(n), Object::Float(m)) => *n == *m,
+      (Object::Float(_), _) => false,
+      (Object::Bool(n), Object::Bool(m)) => n == m,
+      (Object::Bool(_), _) => false,
+      (Object::String(n), Object::String(m)) => n == m,
+      (Object::String(_), _) => false,
+      (Object::Void, Object::Void) => true,
+      (Object::Void, _) => false,
       _ => return Err(format!("{} could not be compared", prev)),
     };
 
-    if !result {
+    if !updated_prev {
+      result = false;
       break;
     }
 
-    prev = param.clone();
+    prev = next;
   }
 
   Ok(Object::Bool(result))
+}
+
+pub fn and<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut result = Object::Void;
+
+  for param in params {
+    let next = param?;
+
+    result = match next {
+      Object::Bool(b) => {
+        if !b {
+          return Ok(Object::Bool(false));
+        }
+
+        Object::Bool(true)
+      }
+      Object::Void => {
+        return Ok(Object::Void);
+      }
+      v => v,
+    }
+  }
+
+  Ok(result)
+}
+
+pub fn or<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result<Object, String> {
+  let mut result = Object::Void;
+
+  for param in params {
+    let next = param?;
+
+    result = match next {
+      Object::Bool(b) => {
+        if b {
+          return Ok(Object::Bool(true));
+        }
+
+        Object::Bool(false)
+      }
+      Object::Void => Object::Void,
+      v => return Ok(v),
+    }
+  }
+
+  Ok(result)
 }

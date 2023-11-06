@@ -162,22 +162,13 @@ mod lexer_tests {
 
   #[test]
   fn test_symbol() {
-    let list = parse(
-      "#t",
-    )
-    .unwrap();
-    assert_eq!(
-      list,
-      Object::Symbol("#t".to_string())
-    )
+    let list = parse("#t").unwrap();
+    assert_eq!(list, Object::Symbol("#t".to_string()))
   }
 
   #[test]
   fn test_quotation() {
-    let list = parse(
-      "'(1 2 3)",
-    )
-    .unwrap();
+    let list = parse("'(1 2 3)").unwrap();
     assert_eq!(
       list,
       Object::Quote(Rc::new(Object::List(vec![

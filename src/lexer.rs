@@ -110,7 +110,9 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
           } else {
             match word.as_str() {
               "define" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
-              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" => Token::Operator(word),
+              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => {
+                Token::Operator(word)
+              }
               "if" => Token::If,
               _ => Token::Symbol(word),
             }
@@ -164,13 +166,7 @@ mod lexer_tests {
 
   #[test]
   fn test_symbol() {
-    let list = tokenize(
-      "#t",
-    )
-    .unwrap();
-    assert_eq!(
-      list,
-      vec![Token::Symbol("#t".to_string())]
-    )
+    let list = tokenize("#t").unwrap();
+    assert_eq!(list, vec![Token::Symbol("#t".to_string())])
   }
 }
