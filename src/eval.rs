@@ -235,11 +235,12 @@ fn eval_eval(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
 
   let param = &list[1];
 
-  match param {
-    Object::Quote(o) => eval_object(&o, env),
-    Object::List(l) => eval_object(&Object::List(l.clone()), env),
-    _ => Err(format!("Invalid argument for eval")),
-  }
+  let unquoted = match param {
+    Object::Quote(o) => &o,
+    o => o,
+  };
+
+  eval_object(unquoted, env)
 }
 
 fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
@@ -300,11 +301,12 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
             }
 
             let head = new_list.first().unwrap_or(&Object::Void);
-            match head {
-              Object::Void => return Ok(Object::Void),
-              _ => {
-                return eval_object(&Object::List(new_list), &mut current_env);
+            return match head {
+              Object::Void => Ok(Object::Void),
+              Object::Bool(_) | Object::Integer(_) | Object::Float(_) | Object::String(_) => {
+                Err(format!("Invalid head of list to call: {}", head))
               }
+              _ => eval_object(&Object::List(new_list), &mut current_env)
             }
           }
         }
@@ -482,8 +484,7 @@ use super::*;
   #[test]
   fn test_eval_to_eval_quoted() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(do
-      (eval '(+ 1 2 3))";
+    let program = "(eval '(+ 1 2 3))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(6));
@@ -503,19 +504,16 @@ use super::*;
   #[test]
   fn test_multi_arguments_operators() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(do
-      (= 1 1 1 1 1 1 1 1 1 1 1 1 1 1))";
+    let program = "(= 1 1 1 1 1 1 1 1 1 1 1 1 1 1)";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Bool(true));
 
-    let program = "(do
-      (= 1 1 1 1 1 1 1 1 1 1 1 1 1 2))";
+    let program = "(= 1 1 1 1 1 1 1 1 1 1 1 1 1 2)";
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Bool(false));
 
-    let program = "(do
-      (+ 10 11 12 13 14 15 16 17 18 19 20))";
+    let program = "(+ 10 11 12 13 14 15 16 17 18 19 20)";
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(165));
   }
@@ -523,8 +521,7 @@ use super::*;
   #[test]
   fn test_evaluate_operator_expression() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(do
-      ((if #f = *) 3 4))";
+    let program = "((if #f = *) 3 4)";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(12));

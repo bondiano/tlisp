@@ -19,14 +19,8 @@ impl fmt::Display for ParseError {
 impl Error for ParseError {}
 
 fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
-  let token = tokens.pop();
-  if token != Some(Token::LParen) {
-    return Err(ParseError {
-      err: format!("Expected LParen, found {:?}", token),
-    });
-  }
-
   let mut list: Vec<Object> = Vec::new();
+
   while !tokens.is_empty() {
     let token = tokens.pop();
     if token == None {
@@ -46,7 +40,6 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
       Token::String(s) => list.push(Object::String(s)),
       Token::Symbol(s) => list.push(Object::Symbol(s)),
       Token::LParen => {
-        tokens.push(Token::LParen);
         let sub_list = parse_list(tokens)?;
         list.push(sub_list);
       }
@@ -131,7 +124,11 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
     }
   }
 
-  Ok(Object::List(list))
+  match list.len() {
+    0 => Ok(Object::List(Vec::new())),
+    1 => Ok(list[0].clone()),
+    _ => Ok(Object::List(list)),
+  }
 }
 
 pub fn parse(program: &str) -> Result<Object, ParseError> {
@@ -164,22 +161,30 @@ mod lexer_tests {
   }
 
   #[test]
-  fn test_quotation() {
+  fn test_symbol() {
     let list = parse(
-      "(do
-      '(1 2 3))",
+      "#t",
     )
     .unwrap();
     assert_eq!(
       list,
-      Object::List(vec![
-        Object::Keyword("do".to_string()),
-        Object::Quote(Rc::new(Object::List(vec![
-          Object::Integer(1),
-          Object::Integer(2),
-          Object::Integer(3),
-        ])))
-      ])
+      Object::Symbol("#t".to_string())
+    )
+  }
+
+  #[test]
+  fn test_quotation() {
+    let list = parse(
+      "'(1 2 3)",
+    )
+    .unwrap();
+    assert_eq!(
+      list,
+      Object::Quote(Rc::new(Object::List(vec![
+        Object::Integer(1),
+        Object::Integer(2),
+        Object::Integer(3),
+      ])))
     )
   }
 }

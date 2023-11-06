@@ -86,18 +86,21 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
       '\'' => {
         tokens.push(Token::Quote);
       }
+      ' ' | '\n' | '\t' => continue,
       _ => {
-        let mut word = String::new();
+        let mut word = String::from(ch);
 
         while chars.len() > 0 && !ch.is_whitespace() && ch != '(' && ch != ')' {
-          word.push(ch);
           let peek = chars[0];
           if peek == '(' || peek == ')' {
             break;
           }
 
           ch = chars.remove(0);
+          word.push(ch);
         }
+
+        let word = String::from(word.trim());
 
         if !word.is_empty() {
           let token = if let Ok(i) = word.parse::<i64>() {
@@ -144,7 +147,7 @@ mod lexer_tests {
 
   #[test]
   fn test_quotation() {
-    let program = "'(1 2 3)";
+    let program = "'(1  2 3)";
     let tokens = tokenize(program).unwrap();
     assert_eq!(
       tokens,
@@ -156,6 +159,18 @@ mod lexer_tests {
         Token::Integer(3),
         Token::RParen,
       ]
+    )
+  }
+
+  #[test]
+  fn test_symbol() {
+    let list = tokenize(
+      "#t",
+    )
+    .unwrap();
+    assert_eq!(
+      list,
+      vec![Token::Symbol("#t".to_string())]
     )
   }
 }
