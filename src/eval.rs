@@ -10,13 +10,18 @@ fn eval_symbol(s: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object, St
     "#t" => return Ok(Object::Bool(true)),
     "#f" => return Ok(Object::Bool(false)),
     "#nil" => return Ok(Object::Void),
-    _ => env.borrow_mut().get(s),
+    _ => env.borrow().get(s),
   };
 
-  if val.is_none() {
-    return Err(format!("Unbound symbol: {}", s));
-  }
-  Ok(val.unwrap().clone())
+  let val = match val {
+    Some(val) => val,
+    None => match env.borrow().get_runtime_fn(s) {
+      Some(_f) => Object::Native(s.to_string()),
+      None => return Err(format!("Unbound symbol: {}", s)),
+    },
+  };
+
+  Ok(val.clone())
 }
 
 fn eval_do(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
@@ -207,7 +212,7 @@ fn eval_function_call(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
 ) -> Result<(Box<Object>, Rc<RefCell<Environment>>), String> {
-  let symbol = env.borrow_mut().get(s);
+  let symbol = env.borrow().get(s);
 
   if symbol.is_none() {
     return Err(format!("Unbound symbol: {}", s));
@@ -261,21 +266,6 @@ fn eval_anonymus_function_call(
   }
 }
 
-fn eval_eval(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  if list.len() != 2 {
-    return Err(format!("Invalid number of arguments for eval"));
-  }
-
-  let param = &list[1];
-
-  let unquoted = match param {
-    Object::Quote(o) => &o,
-    o => o,
-  };
-
-  eval_object(unquoted, env)
-}
-
 fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   let head = &list[0];
   match head {
@@ -285,7 +275,6 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
       "lambda" => eval_function_definition(&list, env),
       "let" => eval_let(&list, env),
       "do" => eval_do(&list, env),
-      "eval" => eval_eval(&list, env),
       _ => Err(format!("Unknown keyword: {}", s)),
     },
     _ => {
@@ -294,7 +283,25 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
   }
 }
 
-fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+fn eval_native(
+  s: &str,
+  list: &Vec<Object>,
+  env: &mut Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
+  let f = env.borrow().get_runtime_fn(&s).unwrap();
+  let mut params = Vec::new();
+
+  let rest_params = list.get(1..).unwrap_or_default();
+
+  for obj in rest_params {
+    let result = eval_object(&obj, env)?;
+    params.push(result);
+  }
+
+  return f(&params, env);
+}
+
+pub fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   let mut current_obj: Box<Object> = Box::new(obj.clone());
   let mut current_env = env.clone();
 
@@ -312,12 +319,18 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
           Object::Symbol(s) => {
             let symbol = eval_symbol(s, &mut current_env)?;
 
-            if let Object::Lambda(_, _, _) = symbol {
-              (current_obj, current_env) = eval_function_call(&s, &list, &mut current_env)?;
-              continue;
-            } else {
-              current_obj = Box::new(symbol);
-              continue;
+            match symbol {
+              Object::Lambda(_, _, _) => {
+                (current_obj, current_env) = eval_function_call(&s, &list, &mut current_env)?;
+                continue;
+              }
+              Object::Native(_) => {
+                return eval_native(&s, &list, &mut current_env);
+              }
+              _ => {
+                current_obj = Box::new(symbol);
+                continue;
+              }
             }
           }
           Object::Lambda(_, _, _) => {
@@ -356,6 +369,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Keyword(k) => return Ok(Object::Keyword(k)),
       Object::Void => return Ok(Object::Void),
       Object::Cond => return Ok(Object::Cond),
+      Object::Native(s) => return Ok(Object::Native(s)),
     }
   }
 }
@@ -370,25 +384,30 @@ pub fn eval(program: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object,
 
 #[cfg(test)]
 mod tests {
+  use crate::runtime::Runtime;
+
   use super::*;
 
   #[test]
   fn test_simple_add() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let result = eval("(+ 1 2)", &mut env).unwrap();
     assert_eq!(result, Object::Integer(3));
   }
 
   #[test]
   fn test_lambda_add() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let result = eval("((lambda (x y) (+ x y)) 2 5)", &mut env).unwrap();
     assert_eq!(result, Object::Integer(7));
   }
 
   #[test]
   fn test_area_of_a_circle() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define r 10)
       (define pi 314)
@@ -399,7 +418,8 @@ mod tests {
 
   #[test]
   fn test_sqr_function() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define sqr (lambda (r) (* r r)))
       (sqr 10))";
@@ -408,8 +428,9 @@ mod tests {
   }
 
   #[test]
-  fn test_fibonaci() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+  fn test_fibonacci() {
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define fib
         (lambda (n)
@@ -423,12 +444,13 @@ mod tests {
 
   #[test]
   fn test_factorial() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define fact
         (lambda (n)
           (cond (< n 1) 1
-          #t (* n (fact (- n 1))))))
+                #t (* n (fact (- n 1))))))
       (fact 5))";
 
     let result = eval(program, &mut env).unwrap();
@@ -437,7 +459,8 @@ mod tests {
 
   #[test]
   fn test_circle_area_function() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define pi 3.14)
       (define r 10)
@@ -451,7 +474,8 @@ mod tests {
 
   #[test]
   fn test_closure() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define add-n
           (lambda (n)
@@ -465,7 +489,8 @@ mod tests {
 
   #[test]
   fn test_return_function() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
 
     let program = "(defun const (n) (lambda (a) n))";
     eval(program, &mut env).unwrap();
@@ -489,7 +514,8 @@ mod tests {
 
   #[test]
   fn test_cond() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define x 40)
       (cond (= x 10) 1
@@ -501,7 +527,8 @@ mod tests {
 
   #[test]
   fn test_tail_recursion() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define sum-n
           (lambda (n a)
@@ -515,7 +542,8 @@ mod tests {
 
   #[test]
   fn test_let() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "
         (let ((x 2) (y 3))
             (let ((x 7)
@@ -528,7 +556,8 @@ mod tests {
 
   #[test]
   fn test_let_tail() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define fact
         (lambda (n)
@@ -546,7 +575,8 @@ mod tests {
 
   #[test]
   fn test_circle_area_no_lambda() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (define pi 314)
       (define r 10)
@@ -560,7 +590,8 @@ mod tests {
 
   #[test]
   fn test_eval_to_eval_quoted() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(eval '(+ 1 2 3))";
 
     let result = eval(program, &mut env).unwrap();
@@ -569,7 +600,8 @@ mod tests {
 
   #[test]
   fn test_eval_quoted_function() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(do
       (defun sqr (r) (* r r))
       (eval '(sqr 10)))";
@@ -580,7 +612,8 @@ mod tests {
 
   #[test]
   fn test_multi_arguments_operators() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(= 1 1 1 1 1 1 1 1 1 1 1 1 1 1)";
 
     let result = eval(program, &mut env).unwrap();
@@ -597,7 +630,8 @@ mod tests {
 
   #[test]
   fn test_evaluate_operator_expression() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "((cond #f = #t *) 3 4)";
 
     let result = eval(program, &mut env).unwrap();
@@ -606,7 +640,8 @@ mod tests {
 
   #[test]
   fn test_or_operator() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(or 1 2 3)";
 
     let result = eval(program, &mut env).unwrap();
@@ -625,7 +660,8 @@ mod tests {
 
   #[test]
   fn test_and_operator() {
-    let mut env: Rc<RefCell<Environment>> = Rc::new(RefCell::new(Environment::new()));
+    let runtime = Runtime::new();
+    let mut env: Rc<RefCell<Environment>> = Rc::new(RefCell::new(Environment::new(runtime)));
     let program = "(and 1 2 3)";
 
     let result = eval(program, &mut env).unwrap();

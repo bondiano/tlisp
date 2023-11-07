@@ -4,6 +4,7 @@ mod lexer;
 mod object;
 mod operators;
 mod parser;
+mod runtime;
 
 use std::fs::File;
 use std::io::Read;
@@ -33,7 +34,8 @@ fn load_prelude(env: &mut Rc<RefCell<environment::Environment>>) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let reader = Interface::new(PROMPT).unwrap();
-  let mut env = Rc::new(RefCell::new(environment::Environment::new()));
+  let runtime = runtime::Runtime::new();
+  let mut env = Rc::new(RefCell::new(environment::Environment::new(runtime)));
 
   load_prelude(&mut env);
 

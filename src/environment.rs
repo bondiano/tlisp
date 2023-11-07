@@ -1,10 +1,11 @@
-use crate::object::Object;
+use crate::{object::Object, runtime};
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Environment {
   parent: Option<Rc<RefCell<Environment>>>,
   vars: HashMap<String, Object>,
+  runtime: runtime::Runtime,
 }
 
 impl PartialEq for Environment {
@@ -14,14 +15,29 @@ impl PartialEq for Environment {
 }
 
 impl Environment {
-  pub fn new() -> Self {
-    Default::default()
+  pub fn new(runtime: runtime::Runtime) -> Self {
+    Environment {
+      parent: None,
+      vars: HashMap::new(),
+      runtime,
+    }
   }
 
   pub fn extend(parent: Rc<RefCell<Self>>) -> Environment {
+    let runtime = parent.borrow().runtime.clone();
     Environment {
       vars: HashMap::new(),
       parent: Some(parent),
+      runtime,
+    }
+  }
+
+  pub fn get_runtime_fn(&self, name: &str) -> Option<Rc<runtime::RuntimeFn>> {
+    let runtime = self.runtime.clone();
+
+    match runtime.get_method(name) {
+      Some(f) => Some(f.clone()),
+      None => None,
     }
   }
 

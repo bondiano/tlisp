@@ -12,6 +12,7 @@ pub enum Object {
   Cond,
   Quote(Rc<Object>),
   Keyword(String),
+  Native(String),
   Operator(String),
   Float(f64),
   Integer(i64),
@@ -20,6 +21,12 @@ pub enum Object {
   Symbol(String),
   Lambda(Vec<String>, Box<Object>, Rc<RefCell<Environment>>),
   List(Vec<Object>),
+}
+
+impl Default for Object {
+  fn default() -> Self {
+    Object::Void
+  }
 }
 
 impl Debug for Object {
@@ -43,6 +50,7 @@ impl Debug for Object {
 
         write!(f, "Lambda(params: ({}), body: {:?})", params_str, body)
       }
+      Object::Native(s) => write!(f, "Native({})", s),
       Object::List(list) => {
         let list_str = list
           .iter()
@@ -72,6 +80,7 @@ impl fmt::Display for Object {
         }
       }
       Object::Symbol(s) => write!(f, "{}", s),
+      Object::Native(s) => write!(f, "{}", s),
       Object::Lambda(params, body, _env) => {
         let params_str = params.join(" ");
 

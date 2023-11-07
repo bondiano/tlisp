@@ -24,7 +24,7 @@ fn token_to_object(t: Token) -> Result<Object, ParseError> {
     Token::Float(f) => Object::Float(f),
     Token::String(s) => Object::String(s),
     Token::Symbol(word) => match word.as_str() {
-      "define" | "defun" | "lambda" | "let" | "do" | "eval" => Object::Keyword(word),
+      "define" | "defun" | "lambda" | "let" | "do" => Object::Keyword(word),
       "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => Object::Operator(word),
       "cond" => Object::Cond,
       _ => Object::Symbol(word),
