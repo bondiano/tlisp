@@ -111,7 +111,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
             Token::Float(f)
           } else {
             match word.as_str() {
-              "define" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
+              "define" | "defun" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
               "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => {
                 Token::Operator(word)
               }
@@ -134,7 +134,9 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
 mod lexer_tests {
   use super::*;
 
-  #[test] fn test_add() { let program = "(+ 2 2)";
+  #[test]
+  fn test_add() {
+    let program = "(+ 2 2)";
     let tokens = tokenize(program).unwrap();
     assert_eq!(
       tokens,

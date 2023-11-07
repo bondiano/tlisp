@@ -36,23 +36,48 @@ fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result
 
   let symbol = match &list[1] {
     Object::Symbol(s) => s,
-    Object::List(l) => {
-      let name = match &l[0] {
-        Object::Symbol(s) => s,
-        _ => return Err(format!("Invalid symbol for define")),
-      };
-
-      let params = Object::List(l[1..].to_vec());
-      let body = list[2].clone();
-      let lambda = eval_function_definition(&vec![Object::Void, params, body], env)?;
-      env.borrow_mut().set(&name, lambda);
-      return Ok(Object::Void);
-    }
     _ => return Err(format!("Invalid symbol for define")),
   };
 
   let value = eval_object(&list[2], env)?;
   env.borrow_mut().set(symbol, value);
+  Ok(Object::Void)
+}
+
+fn eval_defun(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  if list.len() != 4 {
+    return Err(format!("Invalid number of arguments for defun"));
+  }
+
+  let name = match &list[1] {
+    Object::Symbol(s) => s,
+    _ => return Err(format!("Invalid symbol for defun")),
+  };
+
+  let params = match &list[2] {
+    Object::List(l) => {
+      let mut params = Vec::new();
+
+      for obj in l {
+        match obj {
+          Object::Symbol(s) => params.push(s.clone()),
+          _ => return Err(format!("Invalid lambda parameter {:?}", params)),
+        }
+      }
+
+      params
+    }
+    _ => return Err(format!("Expected list of parameters")),
+  };
+
+  let body = match &list[3] {
+    Object::List(l) => l.clone(),
+    _ => return Err(format!("Expected list of body")),
+  };
+
+  let lambda = Object::Lambda(params, body, env.clone());
+  env.borrow_mut().set(&name, lambda);
+
   Ok(Object::Void)
 }
 
@@ -75,7 +100,10 @@ fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box
   }
 }
 
-fn eval_cond(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box<Object>, String> {
+fn eval_cond(
+  list: &Vec<Object>,
+  env: &mut Rc<RefCell<Environment>>,
+) -> Result<Box<Object>, String> {
   if list.len() < 3 {
     return Err(format!("Invalid number of arguments for cond statement"));
   }
@@ -276,6 +304,7 @@ fn eval_keyword(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Resul
   match head {
     Object::Keyword(s) => match s.as_str() {
       "define" => eval_define(&list, env),
+      "defun" => eval_defun(&list, env),
       "lambda" => eval_function_definition(&list, env),
       "let" => eval_let(&list, env),
       "do" => eval_do(&list, env),
@@ -354,7 +383,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Operator(o) => return Ok(Object::Operator(o)),
       Object::Keyword(k) => return Ok(Object::Keyword(k)),
       Object::If => return Ok(Object::If),
-      Object::Cond => return Ok(Object::Cond)
+      Object::Cond => return Ok(Object::Cond),
     }
   }
 }
@@ -369,7 +398,7 @@ pub fn eval(program: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object,
 
 #[cfg(test)]
 mod tests {
-use super::*;
+  use super::*;
 
   #[test]
   fn test_simple_add() {
@@ -514,13 +543,13 @@ use super::*;
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
       (define fact
-      (lambda (n)
-        (let ((fact-iter
-              (lambda (n a)
-                (if (= n 0) a
-                    (fact-iter (- n 1) (* n a))))))
-          (fact-iter n 1))))
-        (fact 5))";
+        (lambda (n)
+          (let ((fact-iter
+                (lambda (n a)
+                  (if (= n 0) a
+                      (fact-iter (- n 1) (* n a))))))
+            (fact-iter n 1))))
+          (fact 5))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(120));
@@ -532,8 +561,8 @@ use super::*;
     let program = "(do
       (define pi 314)
       (define r 10)
-      (define (sqr r) (* r r))
-      (define (area r) (* pi (sqr r)))
+      (defun sqr (r) (* r r))
+      (defun area (r) (* pi (sqr r)))
       (area r))";
 
     let result = eval(program, &mut env).unwrap();
@@ -553,7 +582,7 @@ use super::*;
   fn test_eval_quoted_function() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
-      (define (sqr r) (* r r))
+      (defun sqr (r) (* r r))
       (eval '(sqr 10)))";
 
     let result = eval(program, &mut env).unwrap();
@@ -605,7 +634,7 @@ use super::*;
     assert_eq!(result, Object::Integer(3));
   }
 
-    #[test]
+  #[test]
   fn test_and_operator() {
     let mut env: Rc<RefCell<Environment>> = Rc::new(RefCell::new(Environment::new()));
     let program = "(and 1 2 3)";
