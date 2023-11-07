@@ -11,6 +11,7 @@ pub enum Token {
   Symbol(String),
   Quote,
   If,
+  Cond,
   LParen,
   RParen,
 }
@@ -29,6 +30,7 @@ impl fmt::Display for Token {
         LParen => format!("("),
         RParen => format!(")"),
         If => format!("if"),
+        Cond => format!("cond"),
         Keyword(s) => format!("{}", s),
       })
       .as_str(),
@@ -114,6 +116,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
                 Token::Operator(word)
               }
               "if" => Token::If,
+              "cond" => Token::Cond,
               _ => Token::Symbol(word),
             }
           };
@@ -131,9 +134,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
 mod lexer_tests {
   use super::*;
 
-  #[test]
-  fn test_add() {
-    let program = "(+ 2 2)";
+  #[test] fn test_add() { let program = "(+ 2 2)";
     let tokens = tokenize(program).unwrap();
     assert_eq!(
       tokens,

@@ -75,6 +75,36 @@ fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box
   }
 }
 
+fn eval_cond(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box<Object>, String> {
+  if list.len() < 3 {
+    return Err(format!("Invalid number of arguments for cond statement"));
+  }
+
+  for obj in list[1..].iter() {
+    let cond = match obj {
+      Object::List(list) => list,
+      _ => return Err(format!("Invalid cond statement")),
+    };
+
+    if cond.len() != 2 {
+      return Err(format!("Invalid cond statement"));
+    }
+
+    let cond_obj = eval_object(&cond[0], env)?;
+    let cond_result = match cond_obj {
+      Object::Bool(b) => b,
+      Object::Void => false,
+      _ => return Err(format!("Condition must be a boolean")),
+    };
+
+    if cond_result {
+      return Ok(Box::new(cond[1].clone()));
+    }
+  }
+
+  Ok(Box::new(Object::Void))
+}
+
 fn eval_let(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   let mut result = Object::Void;
   let mut bindings_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
@@ -273,6 +303,10 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
             current_obj = eval_if(&list, &mut current_env)?;
             continue;
           }
+          Object::Cond => {
+            current_obj = eval_cond(&list, &mut current_env)?;
+            continue;
+          }
           Object::Symbol(s) => {
             let symbol = eval_symbol(s, &mut current_env)?;
 
@@ -320,6 +354,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Operator(o) => return Ok(Object::Operator(o)),
       Object::Keyword(k) => return Ok(Object::Keyword(k)),
       Object::If => return Ok(Object::If),
+      Object::Cond => return Ok(Object::Cond)
     }
   }
 }
@@ -334,7 +369,7 @@ pub fn eval(program: &str, env: &mut Rc<RefCell<Environment>>) -> Result<Object,
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+use super::*;
 
   #[test]
   fn test_simple_add() {
@@ -422,6 +457,18 @@ mod tests {
   }
 
   #[test]
+  fn test_cond() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      (define x 40)
+      (cond ((= x 10) 1)
+            ((= x 20) 2)
+            (#t 3)))";
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(3));
+  }
+
+  #[test]
   fn test_tail_recursion() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
@@ -429,6 +476,20 @@ mod tests {
           (lambda (n a)
             (if (= n 0) a
                 (sum-n (- n 1) (+ n a)))))
+      (sum-n 5000 2))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer((12502502) as i64));
+  }
+
+  #[test]
+  fn test_tail_cond_recursion() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+    let program = "(do
+      (define sum-n
+          (lambda (n a)
+            (cond ((= n 0) a)
+                  (#t (sum-n (- n 1) (+ n a))))))
       (sum-n 5000 2))";
 
     let result = eval(program, &mut env).unwrap();

@@ -34,6 +34,7 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
     match token {
       Token::Keyword(k) => list.push(Object::Keyword(k)),
       Token::If => list.push(Object::If),
+      Token::Cond => list.push(Object::Cond),
       Token::Operator(b) => list.push(Object::Operator(b)),
       Token::Integer(n) => list.push(Object::Integer(n)),
       Token::Float(f) => list.push(Object::Float(f)),
@@ -103,6 +104,10 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
           }
           Token::If => {
             list.push(Object::Quote(Rc::new(Object::If)));
+            continue;
+          }
+          Token::Cond => {
+            list.push(Object::Quote(Rc::new(Object::Cond)));
             continue;
           }
           Token::RParen => {

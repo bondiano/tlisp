@@ -6,6 +6,7 @@ use crate::environment::Environment;
 pub enum Object {
   Void,
   If,
+  Cond,
   Quote(Rc<Object>),
   Keyword(String),
   Operator(String),
@@ -59,6 +60,7 @@ impl fmt::Display for Object {
       Object::String(s) => write!(f, "{}", s),
       Object::Quote(o) => write!(f, "'{}", o),
       Object::If => write!(f, "if"),
+      Object::Cond => write!(f, "cond"),
     }
   }
 }
