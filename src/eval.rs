@@ -70,12 +70,9 @@ fn eval_defun(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<
     _ => return Err(format!("Expected list of parameters")),
   };
 
-  let body = match &list[3] {
-    Object::List(l) => l.clone(),
-    _ => return Err(format!("Expected list of body")),
-  };
+  let body = list.get(3).unwrap().to_owned();
 
-  let lambda = Object::Lambda(params, body, env.clone());
+  let lambda = Object::Lambda(params, Box::new(body), env.clone());
   env.borrow_mut().set(&name, lambda);
 
   Ok(Object::Void)
@@ -194,17 +191,15 @@ fn eval_function_definition(
     _ => return Err(format!("Expected list of parameters")),
   };
 
-  let body = match &list[2] {
-    Object::List(list) => list.clone(),
-    _ => return Err(format!("Expected list of body")),
-  };
+  let body = list.get(2).unwrap().to_owned();
 
-  Ok(Object::Lambda(params, body, env.clone()))
+  Ok(Object::Lambda(params, Box::new(body), env.clone()))
 }
 
 fn eval_operator(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   if list.len() < 2 {
-    return Err(format!("Invalid number of arguments for operators"));
+    let operator = list.get(0).unwrap_or(&Object::Void);
+    return Err(format!("Invalid number of arguments for operator {}", operator));
   }
   let operator = list[0].clone();
 
@@ -257,10 +252,10 @@ fn eval_function_call(
         }
       }
 
-      return Ok((Box::new(Object::List(body)), new_env.clone()));
+      Ok((body, new_env.clone()))
     }
     _ => {
-      return Err(format!("Not a lambda"));
+      return Err(format!("{} is not a function", s));
     }
   }
 }
@@ -275,10 +270,14 @@ fn eval_anonymus_function_call(
       let new_env = Rc::new(RefCell::new(Environment::extend(func_env.clone())));
 
       for (i, param) in params.iter().enumerate() {
-        let val = eval_object(&list[i + 1], env)?;
+        let object = match list.get(i + 1) {
+          Some(o) => o,
+          None => return Err(format!("Invalid number of arguments for lambda")),
+        };
+        let val = eval_object(object, env)?;
         new_env.borrow_mut().set(param, val);
       }
-      Ok((Box::new(Object::List(body.clone())), new_env))
+      Ok((body.to_owned(), new_env))
     }
     _ => return Err(format!("Not a lambda")),
   }
@@ -372,7 +371,6 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
           }
         }
       }
-      Object::Void => return Ok(Object::Void),
       Object::Bool(_) => return Ok(obj.clone()),
       Object::Integer(n) => return Ok(Object::Integer(n)),
       Object::Float(n) => return Ok(Object::Float(n)),
@@ -382,8 +380,7 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Quote(o) => return Ok(Object::Quote(o)),
       Object::Operator(o) => return Ok(Object::Operator(o)),
       Object::Keyword(k) => return Ok(Object::Keyword(k)),
-      Object::If => return Ok(Object::If),
-      Object::Cond => return Ok(Object::Cond),
+      v => return Ok(v)
     }
   }
 }
@@ -483,6 +480,27 @@ mod tests {
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(15));
+  }
+
+  #[test]
+  fn test_return_function() {
+    let mut env = Rc::new(RefCell::new(Environment::new()));
+
+    let program = "(defun const (n) (lambda (a) n))";
+    eval(program, &mut env).unwrap();
+
+    let program = "(const 10)";
+    let result = eval(program, &mut env).unwrap();
+
+    let mut expected_env: Environment = Environment::extend(env.clone());
+
+    expected_env.set("n", Object::Integer(10));
+
+    assert_eq!(
+      result,
+      Object::Lambda(vec!["a".to_string()], Box::new(Object::Symbol("n".to_string())),
+      Rc::new(RefCell::new(expected_env)))
+    );
   }
 
   #[test]

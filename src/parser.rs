@@ -18,6 +18,26 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {}
 
+fn token_to_object(t: Token) -> Result<Object, ParseError>  {
+  let object = match t {
+    Token::If => Object::If,
+    Token::Cond => Object::Cond,
+    Token::Keyword(k) => Object::Keyword(k),
+    Token::Operator(b) => Object::Operator(b),
+    Token::Integer(n) => Object::Integer(n),
+    Token::Float(f) => Object::Float(f),
+    Token::String(s) => Object::String(s),
+    Token::Symbol(s) => Object::Symbol(s),
+    _ => {
+      return Err(ParseError {
+        err: format!("Unexpected token: {:?}", t),
+      })
+    }
+  };
+
+  return Ok(object);
+}
+
 fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
   let mut list: Vec<Object> = Vec::new();
 
@@ -32,14 +52,6 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
     let token = token.unwrap();
 
     match token {
-      Token::Keyword(k) => list.push(Object::Keyword(k)),
-      Token::If => list.push(Object::If),
-      Token::Cond => list.push(Object::Cond),
-      Token::Operator(b) => list.push(Object::Operator(b)),
-      Token::Integer(n) => list.push(Object::Integer(n)),
-      Token::Float(f) => list.push(Object::Float(f)),
-      Token::String(s) => list.push(Object::String(s)),
-      Token::Symbol(s) => list.push(Object::Symbol(s)),
       Token::LParen => {
         let sub_list = parse_list(tokens)?;
         list.push(sub_list);
@@ -55,11 +67,20 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
           });
         }
 
-        let mut quoted_tokens = vec![quoted_token.unwrap()];
+        let mut quoted_token = quoted_token.unwrap();
 
-        match quoted_tokens[0] {
+        let mut quote_count = 1;
+
+        while let Token::Quote = quoted_token {
+          quote_count += 1;
+          quoted_token = tokens.pop().unwrap();
+        }
+
+        let object = match quoted_token {
           Token::LParen => {
             let mut paren_count = 1;
+            let mut quoted_tokens = vec![];
+
             while paren_count > 0 {
               let token = tokens.pop();
               if token == None {
@@ -77,54 +98,30 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
                 _ => (),
               }
             }
-          }
-          Token::Integer(ref n) => {
-            list.push(Object::Quote(Rc::new(Object::Integer(*n))));
-            continue;
-          }
-          Token::Float(ref f) => {
-            list.push(Object::Quote(Rc::new(Object::Float(*f))));
-            continue;
-          }
-          Token::Symbol(ref s) => {
-            list.push(Object::Quote(Rc::new(Object::Symbol(s.clone()))));
-            continue;
-          }
-          Token::Keyword(ref k) => {
-            list.push(Object::Quote(Rc::new(Object::Keyword(k.clone()))));
-            continue;
-          }
-          Token::Operator(ref b) => {
-            list.push(Object::Quote(Rc::new(Object::Operator(b.clone()))));
-            continue;
-          }
-          Token::String(ref s) => {
-            list.push(Object::Quote(Rc::new(Object::String(s.clone()))));
-            continue;
-          }
-          Token::If => {
-            list.push(Object::Quote(Rc::new(Object::If)));
-            continue;
-          }
-          Token::Cond => {
-            list.push(Object::Quote(Rc::new(Object::Cond)));
-            continue;
+
+            parse_list(&mut quoted_tokens)
           }
           Token::RParen => {
             return Err(ParseError {
-              err: format!("Unexpected RParen"),
+              err: format!("Unexpected RParen after quote"),
             });
           }
-          Token::Quote => {
-            return Err(ParseError {
-              err: format!("Unexpected Double Quote"),
-            });
+          token => {
+            token_to_object(token.clone())
           }
+        };
+
+        let mut quoted_object: Object = object?;
+        for _ in 0..quote_count {
+          quoted_object = Object::Quote(Rc::new(quoted_object));
         }
 
-        let sub_list = parse_list(&mut quoted_tokens)?;
+        list.push(quoted_object);
+      }
+      token => {
+        let object = token_to_object(token.clone())?;
 
-        list.push(Object::Quote(Rc::new(sub_list)));
+        list.push(object);
       }
     }
   }
@@ -181,6 +178,18 @@ mod lexer_tests {
         Object::Integer(2),
         Object::Integer(3),
       ])))
+    )
+  }
+
+  #[test]
+  fn test_multi_quotation() {
+    let list = parse("''a").unwrap();
+
+    assert_eq!(
+      list,
+      Object::Quote(Rc::new(Object::Quote(Rc::new(Object::Symbol(
+        "a".to_string()
+      )))))
     )
   }
 }

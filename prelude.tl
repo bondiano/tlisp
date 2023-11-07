@@ -21,12 +21,12 @@
         (mul-n (- n 1) (* n a))))
 (defun fact (n)
       (mul-n n 1))
-      (define add-n
-          (lambda (n)
-            (lambda (a) (+ n a))))
+(define add-n
+    (lambda (n)
+      (lambda (a) (+ n a))))
 
 ; -- Utility functions --
 (defun identity (x)
   (x))
 (defun const (n)
-  (lambda (a) (n)))
+  (lambda (a) n))

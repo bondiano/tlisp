@@ -1,10 +1,16 @@
 use crate::object::Object;
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, Default)]
 pub struct Environment {
   parent: Option<Rc<RefCell<Environment>>>,
   vars: HashMap<String, Object>,
+}
+
+impl PartialEq for Environment {
+  fn eq(&self, other: &Self) -> bool {
+    self.vars == other.vars
+  }
 }
 
 impl Environment {
