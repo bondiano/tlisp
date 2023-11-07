@@ -5,7 +5,6 @@ use crate::environment::Environment;
 #[derive(Clone, PartialEq)]
 pub enum Object {
   Void,
-  If,
   Cond,
   Quote(Rc<Object>),
   Keyword(String),
@@ -49,7 +48,6 @@ impl Debug for Object {
 
         write!(f, "List({})", list_str)
       },
-      Object::If => write!(f, "If"),
       Object::Cond => write!(f, "Cond"),
       Object::Quote(o) => write!(f, "Quote({:?})", o),
       Object::Operator(s) => write!(f, "Operator({})", s),
@@ -89,7 +87,6 @@ impl fmt::Display for Object {
       Object::Float(n) => write!(f, "{}", n),
       Object::String(s) => write!(f, "{}", s),
       Object::Quote(o) => write!(f, "'{}", o),
-      Object::If => write!(f, "if"),
       Object::Cond => write!(f, "cond"),
     }
   }

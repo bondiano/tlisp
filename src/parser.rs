@@ -20,7 +20,6 @@ impl Error for ParseError {}
 
 fn token_to_object(t: Token) -> Result<Object, ParseError>  {
   let object = match t {
-    Token::If => Object::If,
     Token::Cond => Object::Cond,
     Token::Keyword(k) => Object::Keyword(k),
     Token::Operator(b) => Object::Operator(b),

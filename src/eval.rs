@@ -31,7 +31,7 @@ fn eval_do(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Obj
 
 fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   if list.len() != 3 {
-    return Err(format!("Invalid number of arguments for define"));
+    return Err(format!("Invalid number of forms for define"));
   }
 
   let symbol = match &list[1] {
@@ -46,7 +46,7 @@ fn eval_define(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result
 
 fn eval_defun(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   if list.len() != 4 {
-    return Err(format!("Invalid number of arguments for defun"));
+    return Err(format!("Invalid number of forms for defun"));
   }
 
   let name = match &list[1] {
@@ -78,52 +78,31 @@ fn eval_defun(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<
   Ok(Object::Void)
 }
 
-fn eval_if(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Box<Object>, String> {
-  if list.len() != 4 {
-    return Err(format!("Invalid number of arguments for if statement"));
-  }
-
-  let cond_obj = eval_object(&list[1], env)?;
-  let cond = match cond_obj {
-    Object::Bool(b) => b,
-    Object::Void => false,
-    _ => return Err(format!("Condition must be a boolean")),
-  };
-
-  if cond {
-    Ok(Box::new(list[2].clone()))
-  } else {
-    Ok(Box::new(list[3].clone()))
-  }
-}
-
 fn eval_cond(
   list: &Vec<Object>,
   env: &mut Rc<RefCell<Environment>>,
 ) -> Result<Box<Object>, String> {
-  if list.len() < 3 {
-    return Err(format!("Invalid number of arguments for cond statement"));
+  if (list.len() % 2) != 1 {
+    return Err(format!("Cond requires an even number of forms"));
   }
 
-  for obj in list[1..].iter() {
-    let cond = match obj {
-      Object::List(list) => list,
-      _ => return Err(format!("Invalid cond statement")),
-    };
+  let args_pairs = list[1..].chunks(2);
+  for args_pair in args_pairs {
+    let cond_obj = args_pair.get(0).unwrap_or(
+      &Object::Void,
+    );
+    let body_ob = args_pair.get(1).unwrap_or(
+      &Object::Void,
+    );
 
-    if cond.len() != 2 {
-      return Err(format!("Invalid cond statement"));
-    }
-
-    let cond_obj = eval_object(&cond[0], env)?;
-    let cond_result = match cond_obj {
+    let cond_result = match eval_object(cond_obj, env)? {
       Object::Bool(b) => b,
       Object::Void => false,
-      _ => return Err(format!("Condition must be a boolean")),
+      _ => true,
     };
 
     if cond_result {
-      return Ok(Box::new(cond[1].clone()));
+      return Ok(Box::new(body_ob.clone()));
     }
   }
 
@@ -135,7 +114,7 @@ fn eval_let(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Ob
   let mut bindings_env = Rc::new(RefCell::new(Environment::extend(env.clone())));
 
   if list.len() < 3 {
-    return Err(format!("Invalid number of arguments for let"));
+    return Err(format!("Invalid number of forms for let"));
   }
 
   let bindings = match list[1].clone() {
@@ -327,10 +306,6 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
         match head {
           Object::Operator(_op) => return eval_operator(&list, &mut current_env),
           Object::Keyword(_k) => return eval_keyword(&list, &mut current_env),
-          Object::If => {
-            current_obj = eval_if(&list, &mut current_env)?;
-            continue;
-          }
           Object::Cond => {
             current_obj = eval_cond(&list, &mut current_env)?;
             continue;
@@ -380,7 +355,8 @@ fn eval_object(obj: &Object, env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       Object::Quote(o) => return Ok(Object::Quote(o)),
       Object::Operator(o) => return Ok(Object::Operator(o)),
       Object::Keyword(k) => return Ok(Object::Keyword(k)),
-      v => return Ok(v)
+      Object::Void => return Ok(Object::Void),
+      Object::Cond => return Ok(Object::Cond),
     }
   }
 }
@@ -436,8 +412,11 @@ mod tests {
   fn test_fibonaci() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
-      (define fib (lambda (n) (if (< n 2) 1 (+ (fib (- n 1)) (fib (- n 2))))))
-        (fib 10))";
+      (define fib
+        (lambda (n)
+          (cond (< n 2) 1
+                #t (+ (fib (- n 1)) (fib (- n 2))))))
+      (fib 10))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer((89) as i64));
@@ -447,8 +426,11 @@ mod tests {
   fn test_factorial() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
-      (define fact (lambda (n) (if (< n 1) 1 (* n (fact (- n 1))))))
-        (fact 5))";
+      (define fact
+        (lambda (n)
+          (cond (< n 1) 1
+          #t (* n (fact (- n 1))))))
+      (fact 5))";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer((120) as i64));
@@ -508,9 +490,9 @@ mod tests {
     let mut env = Rc::new(RefCell::new(Environment::new()));
     let program = "(do
       (define x 40)
-      (cond ((= x 10) 1)
-            ((= x 20) 2)
-            (#t 3)))";
+      (cond (= x 10) 1
+            (= x 20) 2
+            #t 3))";
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(3));
   }
@@ -521,22 +503,8 @@ mod tests {
     let program = "(do
       (define sum-n
           (lambda (n a)
-            (if (= n 0) a
-                (sum-n (- n 1) (+ n a)))))
-      (sum-n 5000 2))";
-
-    let result = eval(program, &mut env).unwrap();
-    assert_eq!(result, Object::Integer((12502502) as i64));
-  }
-
-  #[test]
-  fn test_tail_cond_recursion() {
-    let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "(do
-      (define sum-n
-          (lambda (n a)
-            (cond ((= n 0) a)
-                  (#t (sum-n (- n 1) (+ n a))))))
+            (cond (= n 0) a
+                  #t (sum-n (- n 1) (+ n a)))))
       (sum-n 5000 2))";
 
     let result = eval(program, &mut env).unwrap();
@@ -564,8 +532,9 @@ mod tests {
         (lambda (n)
           (let ((fact-iter
                 (lambda (n a)
-                  (if (= n 0) a
-                      (fact-iter (- n 1) (* n a))))))
+                  (cond
+                      (= n 0) a
+                      #t (fact-iter (- n 1) (* n a))))))
             (fact-iter n 1))))
           (fact 5))";
 
@@ -627,7 +596,7 @@ mod tests {
   #[test]
   fn test_evaluate_operator_expression() {
     let mut env = Rc::new(RefCell::new(Environment::new()));
-    let program = "((if #f = *) 3 4)";
+    let program = "((cond #f = #t *) 3 4)";
 
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Integer(12));

@@ -10,7 +10,6 @@ pub enum Token {
   Keyword(String),
   Symbol(String),
   Quote,
-  If,
   Cond,
   LParen,
   RParen,
@@ -29,7 +28,6 @@ impl fmt::Display for Token {
         Quote => format!("'"),
         LParen => format!("("),
         RParen => format!(")"),
-        If => format!("if"),
         Cond => format!("cond"),
         Keyword(s) => format!("{}", s),
       })
@@ -115,7 +113,6 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
               "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => {
                 Token::Operator(word)
               }
-              "if" => Token::If,
               "cond" => Token::Cond,
               _ => Token::Symbol(word),
             }
