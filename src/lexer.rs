@@ -6,11 +6,8 @@ pub enum Token {
   Integer(i64),
   Float(f64),
   String(String),
-  Operator(String),
-  Keyword(String),
   Symbol(String),
   Quote,
-  Cond,
   LParen,
   RParen,
 }
@@ -22,14 +19,11 @@ impl fmt::Display for Token {
       (match self {
         Integer(n) => format!("{}", n),
         Float(n) => format!("{}", n),
-        Operator(s) => format!("{}", s),
         String(s) => format!("{}", s),
         Symbol(s) => format!("{}", s),
         Quote => format!("'"),
         LParen => format!("("),
         RParen => format!(")"),
-        Cond => format!("cond"),
-        Keyword(s) => format!("{}", s),
       })
       .as_str(),
     )
@@ -108,14 +102,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenError> {
           } else if let Ok(f) = word.parse::<f64>() {
             Token::Float(f)
           } else {
-            match word.as_str() {
-              "define" | "defun" | "lambda" | "let" | "do" | "eval" => Token::Keyword(word),
-              "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => {
-                Token::Operator(word)
-              }
-              "cond" => Token::Cond,
-              _ => Token::Symbol(word),
-            }
+            Token::Symbol(word)
           };
 
           tokens.push(token);
@@ -139,7 +126,7 @@ mod lexer_tests {
       tokens,
       vec![
         Token::LParen,
-        Token::Operator("+".to_string()),
+        Token::Symbol("+".to_string()),
         Token::Integer(2),
         Token::Integer(2),
         Token::RParen,

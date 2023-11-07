@@ -18,15 +18,17 @@ impl fmt::Display for ParseError {
 
 impl Error for ParseError {}
 
-fn token_to_object(t: Token) -> Result<Object, ParseError>  {
+fn token_to_object(t: Token) -> Result<Object, ParseError> {
   let object = match t {
-    Token::Cond => Object::Cond,
-    Token::Keyword(k) => Object::Keyword(k),
-    Token::Operator(b) => Object::Operator(b),
     Token::Integer(n) => Object::Integer(n),
     Token::Float(f) => Object::Float(f),
     Token::String(s) => Object::String(s),
-    Token::Symbol(s) => Object::Symbol(s),
+    Token::Symbol(word) => match word.as_str() {
+      "define" | "defun" | "lambda" | "let" | "do" | "eval" => Object::Keyword(word),
+      "+" | "-" | "*" | "/" | "<" | ">" | "=" | "==" | "%" | "or" | "and" => Object::Operator(word),
+      "cond" => Object::Cond,
+      _ => Object::Symbol(word),
+    },
     _ => {
       return Err(ParseError {
         err: format!("Unexpected token: {:?}", t),
@@ -105,9 +107,7 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
               err: format!("Unexpected RParen after quote"),
             });
           }
-          token => {
-            token_to_object(token.clone())
-          }
+          token => token_to_object(token.clone()),
         };
 
         let mut quoted_object: Object = object?;

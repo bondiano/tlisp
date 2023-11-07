@@ -1,4 +1,8 @@
-use std::{cell::RefCell, fmt::{self, Debug}, rc::Rc};
+use std::{
+  cell::RefCell,
+  fmt::{self, Debug},
+  rc::Rc,
+};
 
 use crate::environment::Environment;
 
@@ -30,7 +34,7 @@ impl Debug for Object {
         } else {
           write!(f, "#f")
         }
-      },
+      }
       Object::String(s) => write!(f, "String({})", s),
       Object::Symbol(s) => write!(f, "Symbol({})", s),
       Object::Keyword(s) => write!(f, "Keyword({})", s),
@@ -38,7 +42,7 @@ impl Debug for Object {
         let params_str = params.join(" ");
 
         write!(f, "Lambda(params: ({}), body: {:?})", params_str, body)
-      },
+      }
       Object::List(list) => {
         let list_str = list
           .iter()
@@ -47,7 +51,7 @@ impl Debug for Object {
           .join(", ");
 
         write!(f, "List({})", list_str)
-      },
+      }
       Object::Cond => write!(f, "Cond"),
       Object::Quote(o) => write!(f, "Quote({:?})", o),
       Object::Operator(s) => write!(f, "Operator({})", s),

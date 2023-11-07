@@ -88,12 +88,8 @@ fn eval_cond(
 
   let args_pairs = list[1..].chunks(2);
   for args_pair in args_pairs {
-    let cond_obj = args_pair.get(0).unwrap_or(
-      &Object::Void,
-    );
-    let body_ob = args_pair.get(1).unwrap_or(
-      &Object::Void,
-    );
+    let cond_obj = args_pair.get(0).unwrap_or(&Object::Void);
+    let body_ob = args_pair.get(1).unwrap_or(&Object::Void);
 
     let cond_result = match eval_object(cond_obj, env)? {
       Object::Bool(b) => b,
@@ -178,7 +174,10 @@ fn eval_function_definition(
 fn eval_operator(list: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   if list.len() < 2 {
     let operator = list.get(0).unwrap_or(&Object::Void);
-    return Err(format!("Invalid number of arguments for operator {}", operator));
+    return Err(format!(
+      "Invalid number of arguments for operator {}",
+      operator
+    ));
   }
   let operator = list[0].clone();
 
@@ -480,8 +479,11 @@ mod tests {
 
     assert_eq!(
       result,
-      Object::Lambda(vec!["a".to_string()], Box::new(Object::Symbol("n".to_string())),
-      Rc::new(RefCell::new(expected_env)))
+      Object::Lambda(
+        vec!["a".to_string()],
+        Box::new(Object::Symbol("n".to_string())),
+        Rc::new(RefCell::new(expected_env))
+      )
     );
   }
 
