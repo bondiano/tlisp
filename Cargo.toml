@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/bondiano/tlisp"
-keywords = ["LISP", "cli", "programming languages"]
+keywords = ["LISP", "cli", "languages"]
 description = """
 Lisp interpreter in Rust
 """
