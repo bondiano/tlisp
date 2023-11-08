@@ -88,13 +88,19 @@ pub fn div<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Result
   let mut quotient: Object = params.next().unwrap()?;
 
   for param in params {
+    let param = param?;
+
+    if param == Object::Integer(0) || param == Object::Float(0.0) {
+      return Err(format!("Cannot divide by zero"));
+    }
+
     quotient = match quotient {
-      Object::Integer(n) => match param? {
+      Object::Integer(n) => match param {
         Object::Integer(m) => Object::Integer(n / m),
         Object::Float(m) => Object::Float(n as f64 / m),
         param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param? {
+      Object::Float(n) => match param {
         Object::Integer(m) => Object::Float(n / m as f64),
         Object::Float(m) => Object::Float(n / m),
         param => return Err(format!("Expected int or float, found {}", param)),
@@ -110,13 +116,19 @@ pub fn mod_<I: Iterator<Item = Result<Object, String>>>(params: &mut I) -> Resul
   let mut remainder: Object = params.next().unwrap()?;
 
   for param in params {
+    let param = param?;
+
+    if param == Object::Integer(0) || param == Object::Float(0.0) {
+      return Err(format!("Cannot get remainder of zero"));
+    }
+
     remainder = match remainder {
-      Object::Integer(n) => match param? {
+      Object::Integer(n) => match param {
         Object::Integer(m) => Object::Integer(n % m),
         Object::Float(m) => Object::Float(n as f64 % m),
         param => return Err(format!("Expected int or float, found {}", param)),
       },
-      Object::Float(n) => match param? {
+      Object::Float(n) => match param {
         Object::Integer(m) => Object::Float(n % m as f64),
         Object::Float(m) => Object::Float(n % m),
         param => return Err(format!("Expected int or float, found {}", param)),

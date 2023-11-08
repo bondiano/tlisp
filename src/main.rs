@@ -64,12 +64,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match eval::eval(input.as_ref(), &mut env) {
-      Ok(value) => {
-        println!("{}", value);
-      }
-      Err(e) => {
-        println!("{}", e);
-      }
+      Ok(result) => println!("{}", result),
+      Err(e) => println!("{}", e)
     }
 
     reader.add_history_unique(input);
