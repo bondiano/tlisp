@@ -47,7 +47,7 @@ fn eval_eval(args: &Vec<Object>, env: &mut Rc<RefCell<Environment>>) -> Result<O
   let param = args.get(0);
 
   if param.is_none() {
-    return Err(format!("Invalid number of arguments for eval"));
+    return Ok(Object::Void);
   }
 
   let param = param.unwrap();
