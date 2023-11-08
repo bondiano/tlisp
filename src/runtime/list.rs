@@ -10,7 +10,7 @@ fn unquote(args: &Vec<Object>) -> Object {
       let o = o.clone();
 
       (*o).clone()
-    },
+    }
     Some(o) => o.clone(),
     None => Object::Void,
   }
@@ -57,7 +57,7 @@ fn cons(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       let o = o.clone();
 
       (*o).clone()
-    },
+    }
     o => o.clone(),
   };
 

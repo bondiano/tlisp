@@ -10,12 +10,12 @@ use std::fs::File;
 use std::io::Read;
 use std::{cell::RefCell, rc::Rc};
 
-use linefeed::{Interface, ReadResult};
+use linefeed::{Interface, ReadResult, Signal};
 
 const PROMPT: &str = "tlisp> ";
 
-fn load_prelude(env: &mut Rc<RefCell<environment::Environment>>) {
-  let file = File::open("prelude.tl");
+fn load_file(path: &str, env: &mut Rc<RefCell<environment::Environment>>) {
+  let file = File::open(path);
 
   match file {
     Ok(mut f) => {
@@ -34,14 +34,19 @@ fn load_prelude(env: &mut Rc<RefCell<environment::Environment>>) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
   let reader = Interface::new(PROMPT).unwrap();
+
+  reader.set_report_signal(Signal::Break, true);
+  reader.set_report_signal(Signal::Continue, true);
+  reader.set_report_signal(Signal::Interrupt, true);
+  reader.set_report_signal(Signal::Suspend, true);
+  reader.set_report_signal(Signal::Quit, true);
+
   let runtime = runtime::Runtime::new();
   let mut env = Rc::new(RefCell::new(environment::Environment::new(runtime)));
 
-  load_prelude(&mut env);
+  reader.set_prompt(format!("{}", PROMPT).as_ref())?;
 
-  reader.set_prompt(format!("{}", PROMPT).as_ref()).unwrap();
-
-  while let ReadResult::Input(input) = reader.read_line().unwrap() {
+  while let ReadResult::Input(input) = reader.read_line()? {
     if input.eq("exit") {
       break;
     }
@@ -56,6 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "env" => {
           println!("{}", &env.borrow());
         }
+        _ if command.starts_with("load") => {
+          let path = input.trim_start_matches(".load ");
+          load_file(path, &mut env);
+        }
         _ => {
           println!("Unknown command: {}", command);
         }
@@ -65,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match eval::eval(input.as_ref(), &mut env) {
       Ok(result) => println!("{}", result),
-      Err(e) => println!("{}", e)
+      Err(e) => println!("{}", e),
     }
 
     reader.add_history_unique(input);

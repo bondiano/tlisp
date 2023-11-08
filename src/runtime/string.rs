@@ -1,6 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use dyn_fmt;
 use crate::{environment::Environment, object::Object};
+use dyn_fmt;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::RuntimeFn;
 
@@ -10,10 +10,10 @@ fn format_(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Ob
   let rest = args.get(1..).unwrap();
 
   match arg {
-    Object::String(str) => {
-      Ok(Object::String(dyn_fmt::AsStrFormatExt::format(str, rest).to_string()))
-    },
-    _ => Ok(Object::Void)
+    Object::String(str) => Ok(Object::String(
+      dyn_fmt::AsStrFormatExt::format(str, rest).to_string(),
+    )),
+    _ => Ok(Object::Void),
   }
 }
 
@@ -22,17 +22,20 @@ fn split(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Obje
 
   let str = match str {
     Some(Object::String(s)) => s,
-    _ => return Ok(Object::Void)
+    _ => return Ok(Object::Void),
   };
 
   let separator = args.get(1);
 
   let separator = match separator {
     Some(Object::String(s)) => s.clone(),
-    _ => "".to_string()
+    _ => "".to_string(),
   };
 
-  let result = str.split(&separator).map(|s| Object::String(s.to_string())).collect::<Vec<Object>>();
+  let result = str
+    .split(&separator)
+    .map(|s| Object::String(s.to_string()))
+    .collect::<Vec<Object>>();
 
   Ok(Object::List(result))
 }
@@ -41,16 +44,20 @@ fn join(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Objec
   let list = args.get(0);
   let list = match list {
     Some(Object::List(l)) => l,
-    _ => return Ok(Object::Void)
+    _ => return Ok(Object::Void),
   };
 
   let separator = args.get(1);
   let separator = match separator {
     Some(Object::String(s)) => s.clone(),
-    _ => "".to_string()
+    _ => "".to_string(),
   };
 
-  let result = list.iter().map(|o| o.to_string()).collect::<Vec<String>>().join(&separator);
+  let result = list
+    .iter()
+    .map(|o| o.to_string())
+    .collect::<Vec<String>>()
+    .join(&separator);
 
   Ok(Object::String(result))
 }
