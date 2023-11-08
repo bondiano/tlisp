@@ -4,11 +4,23 @@ use crate::{environment::Environment, object::Object};
 
 use super::RuntimeFn;
 
+fn unquote(args: &Vec<Object>) -> Object {
+  match args.get(0) {
+    Some(Object::Quote(o)) => {
+      let o = o.clone();
+
+      (*o).clone()
+    },
+    Some(o) => o.clone(),
+    None => Object::Void,
+  }
+}
+
 fn cdr(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  let list = args.get(0);
+  let list = unquote(args);
 
   match list {
-    Some(Object::List(list)) => {
+    Object::List(list) => {
       let cdr = list.get(1..);
 
       match cdr {
@@ -21,10 +33,10 @@ fn cdr(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Object
 }
 
 fn car(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
-  let list = args.get(0);
+  let list = unquote(args);
 
   match list {
-    Some(Object::List(list)) => {
+    Object::List(list) => {
       let car = list.get(0);
 
       match car {
@@ -40,7 +52,14 @@ fn cons(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Objec
   let car = args.get(0);
   let cdr = args.get(1);
 
-  let list = cdr.clone().unwrap_or(&Object::Void);
+  let list = match cdr.clone().unwrap_or(&Object::Void) {
+    Object::Quote(o) => {
+      let o = o.clone();
+
+      (*o).clone()
+    },
+    o => o.clone(),
+  };
 
   match car {
     Some(car) => match list {

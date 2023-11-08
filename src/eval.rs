@@ -677,4 +677,14 @@ mod tests {
     let result = eval(program, &mut env).unwrap();
     assert_eq!(result, Object::Void);
   }
+
+  #[test]
+  fn test_eval_native_methods() {
+    let runtime = Runtime::new();
+    let mut env: Rc<RefCell<Environment>> = Rc::new(RefCell::new(Environment::new(runtime)));
+    let program = "(eval (cons '+ '(1 2 3)))";
+
+    let result = eval(program, &mut env).unwrap();
+    assert_eq!(result, Object::Integer(6));
+  }
 }
