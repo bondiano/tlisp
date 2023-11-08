@@ -4,7 +4,7 @@ use crate::{environment::Environment, object::Object};
 
 use super::RuntimeFn;
 
-fn unquote(args: &Vec<Object>) -> Object {
+pub fn unquote(args: &Vec<Object>) -> Object {
   match args.get(0) {
     Some(Object::Quote(o)) => {
       let o = o.clone();
