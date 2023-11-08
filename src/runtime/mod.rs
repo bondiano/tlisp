@@ -1,4 +1,5 @@
 mod list;
+mod string;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
@@ -26,6 +27,18 @@ impl Debug for Runtime {
 
 fn debug(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
   println!("{:?}", args);
+
+  Ok(Object::Void)
+}
+
+fn print(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Object, String> {
+  let mut result = String::new();
+
+  for arg in args {
+    result.push_str(&arg.to_string());
+  }
+
+  println!("{}", result);
 
   Ok(Object::Void)
 }
@@ -67,10 +80,12 @@ impl Runtime {
   pub fn new() -> Runtime {
     let mut methods: HashMap<String, Rc<RuntimeFn>> = HashMap::new();
 
-    methods.insert("debug".to_string(), Rc::new(debug));
+    methods.insert("debug!".to_string(), Rc::new(debug));
+    methods.insert("print!".to_string(), Rc::new(print));
     methods.insert("eval".to_string(), Rc::new(eval_eval));
 
     list::load_list_fns(&mut methods);
+    string::load_string_fns(&mut methods);
 
     Runtime {
       methods: Rc::new(methods),

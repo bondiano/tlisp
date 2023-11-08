@@ -72,7 +72,7 @@ fn cons(args: &Vec<Object>, _env: &mut Rc<RefCell<Environment>>) -> Result<Objec
       }
       _ => Ok(Object::List(vec![car.clone()])),
     },
-    None => Err("Expects at least one argument".to_string()),
+    None => Ok(Object::List(vec![])),
   }
 }
 
