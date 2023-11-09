@@ -1,9 +1,7 @@
 use crate::lexer::*;
 use crate::object::Object;
 
-use std::error::Error;
-use std::fmt;
-use std::rc::Rc;
+use std::{fmt, vec, error::Error, rc::Rc};
 
 #[derive(Debug)]
 pub struct ParseError {
@@ -39,96 +37,107 @@ fn token_to_object(t: Token) -> Result<Object, ParseError> {
   return Ok(object);
 }
 
+fn quotate(o: Object, count: &mut usize) -> Object {
+  let mut result = o.clone();
+  while *count > 0 {
+    result = Object::Quote(Rc::new(result));
+    *count -= 1;
+  }
+
+  result
+}
+
+#[derive(PartialEq)]
+enum ParserState {
+    Atom,
+    Quote,
+    QuotedList,
+}
+
 fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
+  let mut stack: Vec<Object> = Vec::new();
   let mut list: Vec<Object> = Vec::new();
+  let mut state = ParserState::Atom;
 
-  while !tokens.is_empty() {
-    let token = tokens.pop();
-    if token == None {
-      return Err(ParseError {
-        err: format!("Insufficient tokens"),
-      });
-    }
+  let mut quote_count: usize = 0;
 
-    let token = token.unwrap();
-
+  for token in tokens.iter().rev() {
     match token {
       Token::LParen => {
-        let sub_list = parse_list(tokens)?;
-        list.push(sub_list);
+        stack.push(Object::List(vec![]));
+
+        if state == ParserState::Quote {
+          state = ParserState::QuotedList;
+        }
       }
       Token::RParen => {
-        return Ok(Object::List(list));
-      }
-      Token::Quote => {
-        let quoted_token = tokens.pop();
-        if quoted_token == None {
-          return Err(ParseError {
-            err: format!("Insufficient tokens"),
-          });
-        }
-
-        let mut quoted_token = quoted_token.unwrap();
-
-        let mut quote_count = 1;
-
-        while let Token::Quote = quoted_token {
-          quote_count += 1;
-          quoted_token = tokens.pop().unwrap();
-        }
-
-        let object = match quoted_token {
-          Token::LParen => {
-            let mut paren_count = 1;
-            let mut quoted_tokens = vec![];
-
-            while paren_count > 0 {
-              let token = tokens.pop();
-              if token == None {
-                return Err(ParseError {
-                  err: format!("Insufficient tokens"),
-                });
-              }
-
-              let token = token.unwrap();
-              quoted_tokens.insert(0, token.clone());
-
-              match token {
-                Token::LParen => paren_count += 1,
-                Token::RParen => paren_count -= 1,
-                _ => (),
-              }
-            }
-
-            parse_list(&mut quoted_tokens)
-          }
-          Token::RParen => {
+        let sublist = match stack.pop() {
+          Some(o) => o,
+          None => {
             return Err(ParseError {
-              err: format!("Unexpected RParen after quote"),
-            });
+              err: "Unmatched parenthesis".to_string(),
+            })
           }
-          token => token_to_object(token.clone()),
         };
 
-        let mut quoted_object: Object = object?;
-        for _ in 0..quote_count {
-          quoted_object = Object::Quote(Rc::new(quoted_object));
-        }
+        let to_list = match stack.last_mut() {
+          Some(Object::List(l)) => l,
+          _ => &mut list
+        };
 
-        list.push(quoted_object);
+        match sublist {
+          Object::List(l) => {
+            let l = match state {
+              ParserState::QuotedList => {
+                state = ParserState::Atom;
+                quotate(Object::List(l), &mut quote_count)
+              },
+              _ => Object::List(l),
+            };
+            to_list.push(l);
+          }
+          _ => {
+            return Err(ParseError {
+              err: "Unmatched parenthesis".to_string(),
+            })
+          }
+        }
+      }
+      Token::Quote => {
+        quote_count += 1;
+        state = ParserState::Quote;
       }
       token => {
         let object = token_to_object(token.clone())?;
 
-        list.push(object);
+        let to_list = match stack.len() {
+          0 => &mut list,
+          _ => {
+            let last = stack.last_mut().unwrap();
+            match last {
+              Object::List(l) => l,
+              _ => &mut stack,
+            }
+          }
+        };
+
+        let object = match state {
+          ParserState::Quote => {
+            state = ParserState::Atom;
+            quotate(object, &mut quote_count)
+          }
+          _ => object,
+        };
+
+        to_list.push(object);
       }
     }
   }
 
   match list.len() {
-    0 => Ok(Object::List(Vec::new())),
-    1 => Ok(list[0].clone()),
-    _ => Ok(Object::List(list)),
+    0 => Ok(Object::Void),
+    1 => Ok(list.pop().unwrap()),
+    _ => Ok(Object::List(stack)),
   }
 }
 
@@ -157,6 +166,23 @@ mod lexer_tests {
         Object::Operator("+".to_string()),
         Object::Integer(1),
         Object::Integer(2),
+      ])
+    );
+  }
+
+  #[test]
+  fn test_nested_add() {
+    let list = parse("(+ 1 (+ 2 3))").unwrap();
+    assert_eq!(
+      list,
+      Object::List(vec![
+        Object::Operator("+".to_string()),
+        Object::Integer(1),
+        Object::List(vec![
+          Object::Operator("+".to_string()),
+          Object::Integer(2),
+          Object::Integer(3),
+        ]),
       ])
     );
   }
