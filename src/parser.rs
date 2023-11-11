@@ -37,81 +37,48 @@ fn token_to_object(t: Token) -> Result<Object, ParseError> {
   return Ok(object);
 }
 
-fn quotate(o: Object, count: &mut usize) -> Object {
-  let mut result = o.clone();
-  while *count > 0 {
-    result = Object::Quote(Rc::new(result));
-    *count -= 1;
-  }
-
-  result
-}
-
-#[derive(PartialEq)]
-enum ParserState {
-    Atom,
-    Quote,
-    QuotedList,
-}
-
 fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
   let mut stack: Vec<Object> = Vec::new();
-  let mut list: Vec<Object> = Vec::new();
-  let mut state = ParserState::Atom;
 
-  let mut quote_count: usize = 0;
-
-  for token in tokens.iter().rev() {
+  for token in tokens.iter() {
     match token {
-      Token::LParen => {
-        stack.push(Object::List(vec![]));
-
-        if state == ParserState::Quote {
-          state = ParserState::QuotedList;
-        }
-      }
       Token::RParen => {
+        stack.push(Object::List(vec![]));
+      }
+      Token::LParen => {
         let sublist = match stack.pop() {
           Some(o) => o,
           None => {
             return Err(ParseError {
-              err: "Unmatched parenthesis".to_string(),
+              err: format!("Unexpected token: {:?}", token),
             })
           }
         };
 
-        let to_list = match stack.last_mut() {
+        let to = match stack.last_mut() {
           Some(Object::List(l)) => l,
-          _ => &mut list
+          _ => &mut stack,
         };
 
         match sublist {
           Object::List(l) => {
-            let l = match state {
-              ParserState::QuotedList => {
-                state = ParserState::Atom;
-                quotate(Object::List(l), &mut quote_count)
-              },
-              _ => Object::List(l),
-            };
-            to_list.push(l);
+            let mut l = l.clone();
+            l.reverse();
+
+            to.push(Object::List(l.to_vec()));
           }
-          _ => {
-            return Err(ParseError {
-              err: "Unmatched parenthesis".to_string(),
-            })
+          o => {
+            to.push(o);
           }
         }
       }
       Token::Quote => {
-        quote_count += 1;
-        state = ParserState::Quote;
       }
       token => {
         let object = token_to_object(token.clone())?;
 
-        let to_list = match stack.len() {
-          0 => &mut list,
+        let to = match stack.len() {
+          0 => &mut stack,
           _ => {
             let last = stack.last_mut().unwrap();
             match last {
@@ -121,22 +88,14 @@ fn parse_list(tokens: &mut Vec<Token>) -> Result<Object, ParseError> {
           }
         };
 
-        let object = match state {
-          ParserState::Quote => {
-            state = ParserState::Atom;
-            quotate(object, &mut quote_count)
-          }
-          _ => object,
-        };
-
-        to_list.push(object);
+        to.push(object);
       }
     }
   }
 
-  match list.len() {
+  match stack.len() {
     0 => Ok(Object::Void),
-    1 => Ok(list.pop().unwrap()),
+    1 => Ok(stack.pop().unwrap()),
     _ => Ok(Object::List(stack)),
   }
 }
@@ -188,6 +147,33 @@ mod lexer_tests {
   }
 
   #[test]
+  fn test_nested_operations() {
+    let list = parse("(add 1 (/ 3 (* 10 2)) (+ 2 3))").unwrap();
+
+    assert_eq!(
+      list,
+      Object::List(vec![
+        Object::Symbol("add".to_string()),
+        Object::Integer(1),
+        Object::List(vec![
+          Object::Operator("/".to_string()),
+          Object::Integer(3),
+          Object::List(vec![
+            Object::Operator("*".to_string()),
+            Object::Integer(10),
+            Object::Integer(2),
+          ]),
+        ]),
+        Object::List(vec![
+          Object::Operator("+".to_string()),
+          Object::Integer(2),
+          Object::Integer(3),
+        ]),
+      ])
+    );
+  }
+
+  #[test]
   fn test_symbol() {
     let list = parse("#t").unwrap();
     assert_eq!(list, Object::Symbol("#t".to_string()))
@@ -203,6 +189,33 @@ mod lexer_tests {
         Object::Integer(2),
         Object::Integer(3),
       ])))
+    )
+  }
+
+  #[test]
+  fn test_quotation_inside_list() {
+    let list = parse("('a b)").unwrap();
+    assert_eq!(
+      list,
+      Object::List(vec![
+        Object::Quote(Rc::new(Object::Symbol("a".to_string()))),
+        Object::Symbol("b".to_string())
+      ])
+    )
+  }
+
+  #[test]
+  fn test_quotation_in_quoted_list() {
+    let list = parse("'('('a b))").unwrap();
+
+    assert_eq!(
+      list,
+      Object::Quote(Rc::new(Object::List(vec![Object::Quote(Rc::new(
+        Object::List(vec![
+          Object::Quote(Rc::new(Object::Symbol("a".to_string()))),
+          Object::Symbol("b".to_string())
+        ])
+      ))])))
     )
   }
 
